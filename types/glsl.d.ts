@@ -1,0 +1,13 @@
+// Shader sources are imported as raw strings (see next.config.ts).
+declare module '*.glsl' {
+  const source: string;
+  export default source;
+}
+declare module '*.vert' {
+  const source: string;
+  export default source;
+}
+declare module '*.frag' {
+  const source: string;
+  export default source;
+}
