@@ -25,6 +25,27 @@ varying vec3 vWorldPos;
 varying vec2 vRestXZ;
 varying vec2 vPlankton;
 
+// Glowing fish just below the surface (UnderwaterLife.tsx).
+#define MAX_FISH 4
+uniform vec4 uFish[MAX_FISH];     // (tail x, tail z, head x, head z)
+uniform float uFishGlow[MAX_FISH];
+
+// Soft streak along each fish, brightest at the head, blurred by ~0.5 m of water.
+float fishLight(vec2 p) {
+  float sum = 0.0;
+  for (int i = 0; i < MAX_FISH; i++) {
+    if (uFishGlow[i] <= 0.0) continue;
+    vec2 a = uFish[i].xy;
+    vec2 b = uFish[i].zw;
+    vec2 pa = p - a;
+    vec2 ba = b - a;
+    float h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-6), 0.0, 1.0);
+    float d = length(pa - ba * h);
+    sum += uFishGlow[i] * exp(-d * d / 0.11) * (0.15 + 0.85 * h * h);
+  }
+  return sum;
+}
+
 // Grains are tiny: their peak brightness must be far above their average for
 // them to read as sparks (see grainOctave for the mean).
 const float GRAIN_GAIN = 6.0;
@@ -181,6 +202,8 @@ void main() {
   // attenuated less.
   float transmit = 1.0 - 0.8 * fresnel;
   vec3 glow = deepTint * diffuseLight * transmit + tint * grainLight * mix(transmit, 1.0, 0.5 + 0.5 * crest);
+  // (f) Fish seen through the water: a soft blue-cyan streak.
+  glow += mix(uGlowDeep, uGlowColorA, 0.5) * fishLight(vWorldPos.xz) * 1.1 * transmit;
 
   // Glow travels through more haze than the reflected sky (it starts below the
   // surface and is dim per unit area), so it fades out sooner with distance;

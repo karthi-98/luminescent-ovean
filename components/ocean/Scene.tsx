@@ -6,8 +6,10 @@ import * as THREE from 'three';
 import { CameraRig } from './CameraRig';
 import { detectDevice } from './device';
 import { Interaction } from './Interaction';
+import { Plankton } from './Plankton';
 import { Sky } from './Sky';
 import { OceanContext, useOcean, type OceanState } from './state';
+import { UnderwaterLife } from './UnderwaterLife';
 import { Water } from './Water';
 
 /**
@@ -58,6 +60,13 @@ export default function Scene({ ocean }: SceneProps) {
         <Sky />
         <Water grid={grid} />
         <Interaction resolution={ocean.params.ripple.resolution[device.mobile ? 1 : 2]} />
+        {ocean.params.plankton.enabled && (
+          <Plankton
+            capacity={ocean.params.plankton.count[device.mobile ? 1 : 2]}
+            count={ocean.params.plankton.count[device.mobile ? 1 : 2]}
+          />
+        )}
+        {ocean.params.life.enabled && <UnderwaterLife />}
       </OceanContext.Provider>
     </Canvas>
   );

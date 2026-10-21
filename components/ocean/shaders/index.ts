@@ -11,6 +11,8 @@ import skyVert from './sky.vert';
 import skyFrag from './sky.frag';
 import starsVert from './stars.vert';
 import starsFrag from './stars.frag';
+import particlesVert from './particles.vert';
+import particlesFrag from './particles.frag';
 import rippleVert from './ripple.vert';
 import rippleFrag from './ripple.frag';
 import waterVert from './water.vert';
@@ -38,4 +40,5 @@ export const shaders = {
   stars: { vertex: starsVert, fragment: starsFrag },
   water: { vertex: waterVert, fragment: waterFrag },
   ripple: { vertex: rippleVert, fragment: rippleFrag },
+  particles: { vertex: particlesVert, fragment: particlesFrag },
 };

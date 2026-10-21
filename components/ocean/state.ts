@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { createContext, useContext } from 'react';
 import { config } from './config';
 import { directionFromAngles, displayToScene, linearColor } from './colors';
+import type { RippleSim } from './RippleSim';
 import { WaveField } from './waves';
 
 /** `config` with literal/readonly types widened, so the debug panel can edit a copy. */
@@ -21,6 +22,8 @@ export type OceanParams = Widen<typeof config>;
 
 /** How many recent splashes the particle shader knows about. */
 export const MAX_SPLASHES = 4;
+/** Fish drawn by the water shader at once (must match shaders/water.frag). */
+export const MAX_FISH = 4;
 
 /** 0 = low, 1 = medium, 2 = high. */
 export type QualityTier = 0 | 1 | 2;
@@ -106,7 +109,15 @@ export class OceanState {
     uRippleNormal: { value: 0.6 } as U<number>,
     /** Last MAX_SPLASHES splashes: (x, z, start time, strength) each. */
     uSplashes: { value: new Float32Array(MAX_SPLASHES * 4) } as U<Float32Array>,
+
+    // Under-surface life (UnderwaterLife.tsx → water.frag)
+    /** Per fish: (tail x, tail z, head x, head z). */
+    uFish: { value: new Float32Array(MAX_FISH * 4) } as U<Float32Array>,
+    uFishGlow: { value: new Float32Array(MAX_FISH) } as U<Float32Array>,
   };
+
+  /** The interaction simulation, once the canvas has created it. */
+  ripple: RippleSim | null = null;
 
   private splashIndex = 0;
   private readonly interactionListeners = new Set<() => void>();

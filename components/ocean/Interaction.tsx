@@ -70,7 +70,11 @@ export function Interaction({ resolution }: { resolution: number }) {
   useEffect(() => () => sim.dispose(), [sim]);
   useEffect(() => sim.setResolution(resolution), [sim, resolution]);
   useEffect(() => {
+    ocean.ripple = sim;
     ocean.debug.ripple = sim;
+    return () => {
+      if (ocean.ripple === sim) ocean.ripple = null;
+    };
   }, [ocean, sim]);
 
   const pointer = useMemo<PointerState>(
