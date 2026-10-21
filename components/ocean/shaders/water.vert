@@ -11,6 +11,7 @@
 #include <ocean_noise>
 #include <ocean_waves>
 #include <ocean_glow>
+#include <ocean_ripple>
 
 uniform vec2 uGridSpacing;  // (min spacing near the camera, spacing growth per metre)
 
@@ -24,6 +25,8 @@ void main() {
   float spacing = max(uGridSpacing.x, length(local) * uGridSpacing.y);
 
   vec3 world = vec3(rest.x, 0.0, rest.y) + gerstnerDisplacement(rest, uTime, spacing);
+  // Interaction ripples: a subtle vertical offset (their glow does the talking).
+  world.y += rippleState(world.xz).r * uRippleDisplacement;
 
   vWorldPos = world;
   vRestXZ = rest;

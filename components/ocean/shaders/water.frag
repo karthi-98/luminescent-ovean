@@ -10,6 +10,7 @@
 #include <ocean_sky>
 #include <ocean_waves>
 #include <ocean_glow>
+#include <ocean_ripple>
 
 #define PI 3.14159265
 
@@ -74,7 +75,10 @@ void main() {
   // path is broken up irregularly instead of uniformly.
   float gust = smoothstep(-0.6, 0.8, snoise(vec3(vRestXZ * 0.035, uTime * 0.025)));
   vec3 micro = microWaves(vRestXZ, uTime, footprint, uMicroNormals * (0.35 + 0.9 * gust));
-  vec3 N = normalize(vec3(w.normal.x - micro.x, w.normal.y, w.normal.z - micro.y));
+  // Interaction ripples tilt the normal too, so rings catch the sky and moon.
+  vec4 ripple = rippleState(vWorldPos.xz);
+  vec2 rippleSlope = rippleGradient(vWorldPos.xz) * uRippleNormal;
+  vec3 N = normalize(vec3(w.normal.x - micro.x - rippleSlope.x, w.normal.y, w.normal.z - micro.y - rippleSlope.y));
 
   float NdotV = max(dot(N, V), 1e-3);
 
@@ -135,17 +139,23 @@ void main() {
   float unresolved = clamp(w.lostVar * 5.0, 0.0, 1.0) * 0.07 * density;
   float breaking = max(crest, unresolved);
 
-  // (c) Interaction heightfield: added in the ripple stage.
-  float stirred = 0.0;
+  // (c) Interaction: the ripple simulation's glow-energy channel (pointer
+  //     wakes, splashes, fish). Linear, so a fresh wake can burn well past
+  //     the bloom threshold and then fade with the energy's exponential
+  //     decay. A trail should glow even outside the dense patches, so it
+  //     sees at least half density.
+  float stirred = ripple.b;
+  float stirPlankton = max(plankton, 0.5);
 
   // Wave motion itself stirs the plankton: the rising, compressed faces near
   // crests glow, the stretched troughs between them stay darker.
   float waveStir = 0.3 + 1.1 * crestSoft;
 
   // How strongly the plankton is being agitated (HDR light multiplier)…
-  float energy = uGlowAmbient * waveStir + uGlowCrest * breaking + uGlowRipple * stirred;
+  float natural = uGlowAmbient * waveStir + uGlowCrest * breaking;
+  float touched = uGlowRipple * stirred;
   // …and what fraction of cells flash because of it.
-  float prob = clamp(0.1 + 0.4 * density + 1.2 * (breaking + stirred) + 0.2 * crestSoft, 0.0, 1.0);
+  float prob = clamp(0.1 + 0.4 * density + 1.2 * breaking + 1.2 * stirred + 0.2 * crestSoft, 0.0, 1.0);
 
   // (d) Structure: a soft diffuse part (light scattered under the surface),
   //     mottled at the metre scale, plus discrete flashing grains. Crests put
@@ -154,9 +164,10 @@ void main() {
   float mottle = 1.0 + mottleLod * 0.6 * snoise(vec3(grainPos * 0.8, uTime * 0.12));
   float grains = sparkleField(grainPos, uTime, footprint, prob);
 
-  float diffuseEnergy = uGlowAmbient * waveStir + (uGlowCrest * breaking + uGlowRipple * stirred) * 0.4;
-  float diffuseLight = plankton * diffuseEnergy * (1.0 - uGranularity) * mottle;
-  float grainLight = plankton * energy * uGranularity * grains * GRAIN_GAIN;
+  float diffuseAmount = plankton * (uGlowAmbient * waveStir + uGlowCrest * breaking * 0.4) + stirPlankton * touched * 0.8;
+  float grainAmount = plankton * natural + stirPlankton * touched;
+  float diffuseLight = diffuseAmount * (1.0 - uGranularity) * mottle;
+  float grainLight = grainAmount * uGranularity * grains * GRAIN_GAIN;
 
   // (e) Colour: grains are the cyan→teal of the spec; the diffuse glow comes
   //     from a little deeper and is shifted towards blue; breaking crests

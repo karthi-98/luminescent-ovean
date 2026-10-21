@@ -111,13 +111,13 @@ export const config = {
     /** Master multiplier on every emissive term. */
     intensity: 1.0,
     /** Soft, always-on glow inside plankton patches. */
-    ambient: 1.0,
+    ambient: 0.5,
     /** Glow at breaking crests / whitecaps. */
     crest: 3.6,
     /** Jacobian fold amount where crests start to light up (0..1). */
     crestThreshold: 0.2,
     /** Glow from the interaction heightfield (mouse / touch / fish). */
-    ripple: 4.0,
+    ripple: 5.0,
     /** World-space scale of the drifting plankton patches (1 / metres). */
     noiseScale: 0.05,
     /** Fraction of the sea surface covered by dense patches (0..1). */
@@ -137,21 +137,25 @@ export const config = {
     worldSize: 72,
     /** Texture resolution per quality tier (low, medium, high). */
     resolution: [128, 256, 512] as const,
-    /** Wave propagation (c² in texels² per step, stable below 0.5). */
-    waveSpeed: 0.42,
-    /** Per-step damping of the height field (closer to 1 = longer ripples). */
-    damping: 0.988,
-    /** Per-second decay of the glow energy left behind by a disturbance. */
-    decay: 0.55,
-    /** How much the glow energy spreads out. */
-    diffusion: 0.18,
-    /** Vertical displacement of the water from the ripple heightfield. */
+    /** Ripple propagation speed, m/s. */
+    waveSpeed: 2.6,
+    /** Fraction of ripple height left after one second (lower = ripples die sooner). */
+    damping: 0.35,
+    /** Seconds for a glowing trail to fade to ~37 % ("ripple decay"). */
+    glowLifetime: 1.9,
+    /** How fast the glow energy spreads out, m²/s. */
+    diffusion: 0.09,
+    /** Passing ripples stir the plankton too: energy per unit of height change. */
+    motionGlow: 0.25,
+    /** Vertical displacement of the water from the ripple heightfield (subtle). */
     displacement: 0.22,
+    /** How strongly ripples tilt the surface normal (catches sky + moon light). */
+    normalStrength: 0.7,
     /** Brush radius of a pointer stroke, metres. */
-    brushRadius: 0.9,
+    brushRadius: 0.55,
     strokeStrength: 1.0,
-    splashRadius: 2.4,
-    splashStrength: 4.0,
+    splashRadius: 1.6,
+    splashStrength: 1.0,
   },
 
   plankton: {

@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import commonChunk from './common.glsl';
 import glowChunk from './glow.glsl';
 import noiseChunk from './noise.glsl';
+import rippleChunk from './ripple.glsl';
 import skyChunk from './sky.glsl';
 import wavesChunk from './waves.glsl';
 
@@ -10,6 +11,8 @@ import skyVert from './sky.vert';
 import skyFrag from './sky.frag';
 import starsVert from './stars.vert';
 import starsFrag from './stars.frag';
+import rippleVert from './ripple.vert';
+import rippleFrag from './ripple.frag';
 import waterVert from './water.vert';
 import waterFrag from './water.frag';
 
@@ -24,6 +27,7 @@ const chunks: Record<string, string> = {
   ocean_sky: skyChunk,
   ocean_waves: wavesChunk,
   ocean_glow: glowChunk,
+  ocean_ripple: rippleChunk,
 };
 
 const registry = THREE.ShaderChunk as unknown as Record<string, string>;
@@ -33,4 +37,5 @@ export const shaders = {
   sky: { vertex: skyVert, fragment: skyFrag },
   stars: { vertex: starsVert, fragment: starsFrag },
   water: { vertex: waterVert, fragment: waterFrag },
+  ripple: { vertex: rippleVert, fragment: rippleFrag },
 };

@@ -5,6 +5,7 @@ import { useState } from 'react';
 import * as THREE from 'three';
 import { CameraRig } from './CameraRig';
 import { detectDevice } from './device';
+import { Interaction } from './Interaction';
 import { Sky } from './Sky';
 import { OceanContext, useOcean, type OceanState } from './state';
 import { Water } from './Water';
@@ -56,6 +57,7 @@ export default function Scene({ ocean }: SceneProps) {
         <CameraRig />
         <Sky />
         <Water grid={grid} />
+        <Interaction resolution={ocean.params.ripple.resolution[device.mobile ? 1 : 2]} />
       </OceanContext.Provider>
     </Canvas>
   );

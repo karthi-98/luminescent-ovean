@@ -19,6 +19,9 @@ type Widen<T> = T extends string
 
 export type OceanParams = Widen<typeof config>;
 
+/** How many recent splashes the particle shader knows about. */
+export const MAX_SPLASHES = 4;
+
 /** 0 = low, 1 = medium, 2 = high. */
 export type QualityTier = 0 | 1 | 2;
 
@@ -94,10 +97,53 @@ export class OceanState {
     uGranularity: { value: 0.8 } as U<number>,
     uSparkleScale: { value: 3 } as U<number>,
     uCurrent: { value: new THREE.Vector2(0.05, -0.03) } as U<THREE.Vector2>,
+
+    // Interaction heightfield (shaders/ripple.glsl), written by RippleSim
+    uRippleTex: { value: null } as U<THREE.Texture | null>,
+    uRippleDomain: { value: new THREE.Vector3(0, 0, 72) } as U<THREE.Vector3>,
+    uRippleTexel: { value: 1 / 256 } as U<number>,
+    uRippleDisplacement: { value: 0.2 } as U<number>,
+    uRippleNormal: { value: 0.6 } as U<number>,
+    /** Last MAX_SPLASHES splashes: (x, z, start time, strength) each. */
+    uSplashes: { value: new Float32Array(MAX_SPLASHES * 4) } as U<Float32Array>,
   };
+
+  private splashIndex = 0;
+  private readonly interactionListeners = new Set<() => void>();
+  private interacted = false;
 
   constructor() {
     this.applyParams();
+    // Start time far in the past so empty splash slots are long finished.
+    for (let i = 0; i < MAX_SPLASHES; i++) this.uniforms.uSplashes.value[i * 4 + 2] = -1e4;
+  }
+
+  /** Records a splash for the particles (ring buffer of MAX_SPLASHES). */
+  addSplash(x: number, z: number, strength: number) {
+    const v = this.uniforms.uSplashes.value;
+    const o = this.splashIndex * 4;
+    v[o] = x;
+    v[o + 1] = z;
+    v[o + 2] = this.time;
+    v[o + 3] = strength;
+    this.splashIndex = (this.splashIndex + 1) % MAX_SPLASHES;
+  }
+
+  /** The overlay hides its hint once the user has touched the water. */
+  onFirstInteraction(listener: () => void): () => void {
+    if (this.interacted) {
+      listener();
+      return () => {};
+    }
+    this.interactionListeners.add(listener);
+    return () => this.interactionListeners.delete(listener);
+  }
+
+  notifyInteraction() {
+    if (this.interacted) return;
+    this.interacted = true;
+    this.interactionListeners.forEach((l) => l());
+    this.interactionListeners.clear();
   }
 
   /**
@@ -146,6 +192,9 @@ export class OceanState {
     u.uGlowDrift.value = g.drift;
     u.uGranularity.value = g.granularity;
     u.uSparkleScale.value = g.sparkleScale;
+
+    u.uRippleDisplacement.value = p.ripple.displacement;
+    u.uRippleNormal.value = p.ripple.normalStrength;
 
     this.waves.update(p.waves.list, p.waves.count, p.waves.amplitude, p.waves.speed);
     u.uWaveCount.value = this.waves.count;
