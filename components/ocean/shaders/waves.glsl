@@ -3,10 +3,15 @@
 // waves.ts, so the boat and the pointer ray-cast see the same surface.
 //
 // For a rest position p on the flat sea, each wave moves the water particle
-// on a circle:   f = k (D·p − c t) + φ
+// on a circle:   f = k (D·p) − ω t + φ
 //                P = p + Σ ( D a cos f ,  a sin f )
-// with k = 2π/λ, c = √(g/k) (deep-water phase speed) and amplitude a = Q/k,
+// with k = 2π/λ, ω = k √(g/k) (deep-water dispersion) and amplitude a = Q/k,
 // where Q is the steepness. Σ Q ≤ 1 keeps the crests from looping over.
+//
+// Precision: the shader never sees t. The CPU uploads (φ − ω t) mod 2π each
+// frame (in float64), so the phase stays exact after hours of running.
+// `dt` below is an offset from "now" (0 for the current frame, −0.35 for the
+// particles' afterglow look-up), which is small and therefore safe.
 //
 // The derivatives are analytic, so normals need no finite differences:
 //   ∂P/∂x = (1 − Dx² Q sin f,  Dx Q cos f,  −Dx Dz Q sin f)   (tangent)
@@ -18,8 +23,8 @@
 // ---------------------------------------------------------------------------
 #define MAX_WAVES 8
 
-uniform vec4 uWaveA[MAX_WAVES];  // (dirX, dirZ, k, c)
-uniform vec4 uWaveB[MAX_WAVES];  // (steepness Q, amplitude a, phase φ, wavelength λ)
+uniform vec4 uWaveA[MAX_WAVES];  // (dirX, dirZ, k, ω)
+uniform vec4 uWaveB[MAX_WAVES];  // (steepness Q, amplitude a, (φ − ω t) mod 2π, wavelength λ)
 uniform int uWaveCount;
 
 // Level of detail: a wave whose wavelength is only a few samples long
@@ -30,7 +35,7 @@ float waveLod(float wavelength, float footprint) {
 }
 
 // Displacement only — cheap path for the vertex shader.
-vec3 gerstnerDisplacement(vec2 p, float t, float footprint) {
+vec3 gerstnerDisplacement(vec2 p, float dt, float footprint) {
   vec3 d = vec3(0.0);
   for (int i = 0; i < MAX_WAVES; i++) {
     if (i >= uWaveCount) break;
@@ -38,7 +43,7 @@ vec3 gerstnerDisplacement(vec2 p, float t, float footprint) {
     vec4 B = uWaveB[i];
     float lod = waveLod(B.w, footprint);
     if (lod <= 0.0) continue;
-    float f = A.z * (dot(A.xy, p) - A.w * t) + B.z;
+    float f = A.z * dot(A.xy, p) + B.z - A.w * dt;
     float amp = B.y * lod;
     d.xz += A.xy * (amp * cos(f));
     d.y += amp * sin(f);
@@ -54,7 +59,7 @@ struct WaveSample {
 };
 
 // Full evaluation with the analytic tangent frame — used per pixel.
-WaveSample gerstnerSample(vec2 p, float t, float footprint) {
+WaveSample gerstnerSample(vec2 p, float dt, float footprint) {
   vec3 d = vec3(0.0);
   vec3 T = vec3(1.0, 0.0, 0.0);
   vec3 Bn = vec3(0.0, 0.0, 1.0);
@@ -70,7 +75,7 @@ WaveSample gerstnerSample(vec2 p, float t, float footprint) {
     lostVar += (1.0 - lod) * B.x * B.x * 0.5;
     if (lod <= 0.0) continue;
     vec2 D = A.xy;
-    float f = A.z * (dot(D, p) - A.w * t) + B.z;
+    float f = A.z * dot(D, p) + B.z - A.w * dt;
     float sf = sin(f);
     float cf = cos(f);
     float q = B.x * lod;

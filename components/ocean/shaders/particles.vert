@@ -50,7 +50,7 @@ void main() {
   float edgeFade = 1.0 - smoothstep(0.3, 0.5, max(abs(local.x), abs(local.y)) / uParticleDomain);
 
   // --- Surface position --------------------------------------------------------
-  WaveSample w = gerstnerSample(rest, uTime, 0.0);
+  WaveSample w = gerstnerSample(rest, 0.0, 0.0);
   vec3 world = vec3(rest.x, 0.0, rest.y) + w.displacement;
   vec4 ripple = rippleState(world.xz);
   world.y += ripple.r * uRippleDisplacement + 0.05;
@@ -59,7 +59,7 @@ void main() {
   // Crest now, and 0.35 s ago at reduced weight: a short afterglow.
   float crestNow = smoothstep(uGlowCrestThreshold - 0.05, uGlowCrestThreshold + 0.3, 1.0 - w.jacobian);
 #if OCEAN_QUALITY >= 1
-  WaveSample wPast = gerstnerSample(rest, uTime - 0.35, 0.0);
+  WaveSample wPast = gerstnerSample(rest, -0.35, 0.0);
   float crestPast = smoothstep(uGlowCrestThreshold - 0.05, uGlowCrestThreshold + 0.3, 1.0 - wPast.jacobian);
   float crest = max(crestNow, crestPast * 0.6);
 #else
@@ -116,14 +116,16 @@ void main() {
   // Perspective size of a ~4 cm glow (deeper cells look bigger and softer).
   float worldSize = (0.03 + 0.05 * aRandom.z) * (1.0 + depth * 0.8) * uParticleSize;
   float px = worldSize * projectionMatrix[1][1] * 0.5 * uViewportHeight / max(-mv.z, 0.1);
-  // Below ~1.5 px points flicker; clamp and keep their energy constant instead.
-  float minPx = 1.5 * uPixelRatio;
+  // The sprite gaussian is ~1/7 of the sprite wide: below ~3.5 px it is
+  // narrower than a pixel and flickers. Clamp and keep the energy constant.
+  float minPx = 3.5 * uPixelRatio;
   float size = max(px, minPx);
   brightness *= min((px * px) / (size * size), 1.0);
   gl_PointSize = min(size, 24.0 * uPixelRatio);
 
-  // Bright & shallow → white-hot cyan; deep → blue.
-  vec3 tint = mix(uGlowColorA, uGlowDeep, clamp(depth / max(uParticleDepth, 1e-3), 0.0, 1.0) * 0.7);
+  // Shallow cells: the cyan → teal of the patches; deeper ones lean a little blue.
+  vec3 tint = mix(uGlowColorA, uGlowColorB, density * 0.5);
+  tint = mix(tint, uGlowDeep, clamp(depth / max(uParticleDepth, 1e-3), 0.0, 1.0) * 0.3);
   vColor = tint * brightness * 3.0;
   vSoftness = clamp(depth / max(uParticleDepth, 1e-3), 0.0, 1.0);
 }

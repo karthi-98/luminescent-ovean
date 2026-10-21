@@ -146,7 +146,7 @@ export const config = {
     /** Ripple propagation speed, m/s. */
     waveSpeed: 2.6,
     /** Fraction of ripple height left after one second (lower = ripples die sooner). */
-    damping: 0.35,
+    damping: 0.6,
     /** Seconds for a glowing trail to fade to ~37 % ("ripple decay"). */
     glowLifetime: 1.9,
     /** How fast the glow energy spreads out, m²/s. */
@@ -197,7 +197,7 @@ export const config = {
     /** Film grain amount (0 = off, 1 = heavy). */
     grain: 0.35,
     /** Radial chromatic aberration at the frame edges (UV offset). */
-    chromaticAberration: 0.00045,
+    chromaticAberration: 0.0003,
     /** ACES exposure. Sky/water colours are compensated, so this mostly scales the glow. */
     exposure: 1.0,
   },

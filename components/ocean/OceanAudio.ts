@@ -55,6 +55,7 @@ export class OceanAudio {
   private sources: AudioBufferSourceNode[] = [];
   private enabled = false;
   private lastUpdate = 0;
+  private suspendTimer = 0;
 
   get isEnabled() {
     return this.enabled;
@@ -131,15 +132,23 @@ export class OceanAudio {
   /** Must be called from a user gesture the first time (autoplay policy). */
   async setEnabled(on: boolean) {
     this.enabled = on;
+    window.clearTimeout(this.suspendTimer);
     if (on) {
       const ctx = this.ctx ?? this.build();
       await ctx.resume();
-      this.master?.gain.setTargetAtTime(0.55, ctx.currentTime, 0.8);
+      // Muted again while the output device was waking up? Then stay silent.
+      if (!this.enabled || !this.master) return;
+      this.master.gain.setTargetAtTime(0.55, ctx.currentTime, 0.8);
     } else if (this.ctx && this.master) {
       const ctx = this.ctx;
-      this.master.gain.setTargetAtTime(0, ctx.currentTime, 0.2);
-      window.setTimeout(() => {
-        if (!this.enabled) void ctx.suspend();
+      const master = this.master;
+      master.gain.setTargetAtTime(0, ctx.currentTime, 0.2);
+      this.suspendTimer = window.setTimeout(() => {
+        if (this.enabled) return;
+        // Land exactly on silence so the next enable fades in from zero.
+        master.gain.cancelScheduledValues(ctx.currentTime);
+        master.gain.setValueAtTime(0, ctx.currentTime);
+        void ctx.suspend();
       }, 900);
     }
   }
@@ -165,6 +174,7 @@ export class OceanAudio {
   }
 
   dispose() {
+    window.clearTimeout(this.suspendTimer);
     document.removeEventListener('visibilitychange', this.onVisibility);
     this.sources.forEach((s) => s.stop());
     this.sources = [];

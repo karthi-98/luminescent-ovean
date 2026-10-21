@@ -7,12 +7,12 @@ import type { OceanState } from './ocean/state';
 export interface OverlayProps {
   ocean: OceanState;
   audio: OceanAudio;
-  /** null until the device has been detected on the client. */
-  mobile: boolean | null;
+  /** Touch-first device? null until detected on the client (keeps SSR markup neutral). */
+  touchFirst: boolean | null;
 }
 
 /** Minimal UI over the scene: a hint that fades once the water is touched, and a sound toggle. */
-export default function Overlay({ ocean, audio, mobile }: OverlayProps) {
+export default function Overlay({ ocean, audio, touchFirst }: OverlayProps) {
   const [touched, setTouched] = useState(false);
   const [sound, setSound] = useState(false);
 
@@ -26,11 +26,11 @@ export default function Overlay({ ocean, audio, mobile }: OverlayProps) {
 
   return (
     <div className="overlay">
-      {mobile !== null && (
+      {touchFirst !== null && (
         <p className={`hint${touched ? ' hint--hidden' : ''}`} aria-live="polite">
-          <span className="hint__main">{mobile ? 'drag a finger across the water' : 'move across the water to touch it'}</span>
+          <span className="hint__main">{touchFirst ? 'drag a finger across the water' : 'move across the water to touch it'}</span>
           <span className="hint__sub">
-            {mobile ? 'tap to splash · two fingers to look around' : 'click to splash · drag to look around'}
+            {touchFirst ? 'tap to splash · two fingers to look around' : 'click to splash · drag to look around'}
           </span>
         </p>
       )}
@@ -39,8 +39,8 @@ export default function Overlay({ ocean, audio, mobile }: OverlayProps) {
         className="sound-toggle"
         onClick={toggleSound}
         aria-pressed={sound}
-        aria-label={sound ? 'Mute ocean sound' : 'Play ocean sound'}
-        title={sound ? 'Mute' : 'Sound'}
+        aria-label="Ocean sound"
+        title={sound ? 'Sound on' : 'Sound off'}
       >
         <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
           <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor" />

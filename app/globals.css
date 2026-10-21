@@ -97,6 +97,13 @@ body {
   transform: translate(-50%, 8px);
 }
 
+/* Narrow phones: lift the hint above the sound button instead of under it. */
+@media (max-width: 520px) {
+  .hint {
+    bottom: calc(76px + env(safe-area-inset-bottom));
+  }
+}
+
 @keyframes hint-in {
   to {
     opacity: 1;

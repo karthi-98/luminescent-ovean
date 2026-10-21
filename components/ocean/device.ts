@@ -2,8 +2,10 @@ import type { QualityTier } from './state';
 
 /** Coarse device classification, evaluated once in the browser. */
 export interface DeviceProfile {
-  /** Phone / tablet: touch-first, weaker GPU, tighter thermal budget. */
+  /** Phone-class device: weaker GPU, tighter thermal budget (drives DPR / tiers). */
   mobile: boolean;
+  /** Primary input is a finger (phones *and* touch tablets): drives the hint text. */
+  touchFirst: boolean;
   /** Device-pixel-ratio clamp handed to the canvas. */
   dpr: [number, number];
   /** Highest quality tier this class of device is allowed to climb to. */
@@ -15,14 +17,17 @@ export interface DeviceProfile {
 }
 
 export function detectDevice(): DeviceProfile {
-  if (typeof window === 'undefined') return { mobile: false, dpr: [1, 2], maxTier: 2, startTier: 2, maxFps: 60 };
+  if (typeof window === 'undefined')
+    return { mobile: false, touchFirst: false, dpr: [1, 2], maxTier: 2, startTier: 2, maxFps: 60 };
   const coarse = window.matchMedia?.('(pointer: coarse)').matches ?? false;
+  const noHover = window.matchMedia?.('(hover: none)').matches ?? false;
   const touch = navigator.maxTouchPoints > 0;
+  const touchFirst = touch && (coarse || noHover);
   const smallScreen = Math.min(window.screen.width, window.screen.height) < 820;
   const mobile = coarse && touch && smallScreen;
   return mobile
-    ? { mobile, dpr: [1, 1.5], maxTier: 1, startTier: 1, maxFps: 60 }
-    : { mobile, dpr: [1, 2], maxTier: 2, startTier: 2, maxFps: 60 };
+    ? { mobile, touchFirst, dpr: [1, 1.5], maxTier: 1, startTier: 1, maxFps: 60 }
+    : { mobile, touchFirst, dpr: [1, 2], maxTier: 2, startTier: 2, maxFps: 60 };
 }
 
 export interface UrlOptions {

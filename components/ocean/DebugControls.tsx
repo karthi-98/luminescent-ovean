@@ -1,7 +1,7 @@
 'use client';
 
 import { folder, Leva, monitor, useControls } from 'leva';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { OceanState } from './state';
 
 /**
@@ -139,5 +139,7 @@ export default function DebugControls({ ocean, onRerender }: DebugControlsProps)
     if (rerender) onRerender();
   }, [values, ocean, onRerender]);
 
-  return <Leva collapsed={false} titleBar={{ title: 'luminescent ocean' }} />;
+  // Start collapsed on narrow screens, where the panel would cover the water.
+  const [narrow] = useState(() => typeof window !== 'undefined' && window.innerWidth < 760);
+  return <Leva collapsed={narrow} titleBar={{ title: 'luminescent ocean' }} />;
 }

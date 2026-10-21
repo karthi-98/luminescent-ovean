@@ -4,12 +4,12 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { directionFromAngles } from './colors';
 import { useOcean } from './state';
-import type { SurfaceSample } from './waves';
+import type { SampleFilter, SurfaceSample } from './waves';
 
 const UP = new THREE.Vector3(0, 1, 0);
-/** Waves shorter than these (metres) average out under the hull (see WaveField.sample). */
-const HULL_HEAVE = 1.4;
-const HULL_TILT = 4.5;
+/** Waves shorter than these hull lengths (metres) average out under the boat (see WaveField.sample). */
+const HEAVE_FILTER: SampleFilter = { hull: 1.4 };
+const TILT_FILTER: SampleFilter = { hull: 4.5 };
 
 /**
  * "Sitting in a small boat" camera.
@@ -28,8 +28,25 @@ const HULL_TILT = 4.5;
  */
 export function CameraRig() {
   const ocean = useOcean();
-  const camera = useThree((s) => s.camera);
+  const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
   const domElement = useThree((s) => s.gl.domElement);
+  const size = useThree((s) => s.size);
+  const portrait = size.width < size.height;
+
+  // FOV 50 is the vertical field of view on landscape screens. On a portrait
+  // phone that leaves only ~24° horizontally, which feels like peering
+  // through a slot, so the vertical FOV widens until ~34° fit across.
+  useEffect(() => {
+    const aspect = size.width / Math.max(size.height, 1);
+    const baseHalf = THREE.MathUtils.degToRad(ocean.params.camera.fov / 2);
+    const minHalfH = THREE.MathUtils.degToRad(17);
+    const half = aspect < 1 ? Math.atan(Math.max(Math.tan(baseHalf), Math.tan(minHalfH) / aspect)) : baseHalf;
+    const fov = Math.min(THREE.MathUtils.radToDeg(2 * half), 80);
+    if (Math.abs(camera.fov - fov) > 0.01) {
+      camera.fov = fov;
+      camera.updateProjectionMatrix();
+    }
+  }, [camera, size.width, size.height, ocean]);
 
   const proxy = useMemo(() => new THREE.PerspectiveCamera(), []);
   const controls = useMemo(() => {
@@ -47,11 +64,14 @@ export function CameraRig() {
     c.touches = { ONE: null, TWO: THREE.TOUCH.DOLLY_ROTATE };
 
     proxy.position.set(0, 0, 0);
-    const forward = directionFromAngles(cam.initialYaw, cam.initialPitch);
+    // A narrow portrait view would leave the low moon out of frame: turn
+    // half-way towards it so the opening shot still has it.
+    const yaw = portrait ? (cam.initialYaw + ocean.params.moon.azimuth) / 2 : cam.initialYaw;
+    const forward = directionFromAngles(yaw, cam.initialPitch);
     c.target.copy(forward).multiplyScalar(0.01);
     c.update();
     return c;
-  }, [ocean, proxy, domElement]);
+  }, [ocean, proxy, domElement]); // eslint-disable-line react-hooks/exhaustive-deps -- initial yaw only
 
   useEffect(() => () => controls.dispose(), [controls]);
   useEffect(() => {
@@ -98,8 +118,8 @@ export function CameraRig() {
     // Height follows the surface fairly closely (a small boat lifts on chop
     // too); tilt only follows waves long enough to rock the whole hull.
     const w = ocean.waves;
-    const targetY = w.sample(bx, bz, t, s.sample, HULL_HEAVE).height;
-    w.sample(bx, bz, t, s.sample, HULL_TILT);
+    const targetY = w.sample(bx, bz, t, s.sample, HEAVE_FILTER).height;
+    w.sample(bx, bz, t, s.sample, TILT_FILTER);
     const targetNx = s.sample.nx / s.sample.ny;
     const targetNz = s.sample.nz / s.sample.ny;
 

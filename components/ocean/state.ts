@@ -4,7 +4,7 @@ import { config } from './config';
 import { directionFromAngles, displayToScene, linearColor } from './colors';
 import type { OceanAudio } from './OceanAudio';
 import type { RippleSim } from './RippleSim';
-import { WaveField } from './waves';
+import { MICRO_WAVES, microPhases, WaveField } from './waves';
 
 /** `config` with literal/readonly types widened, so the debug panel can edit a copy. */
 type Widen<T> = T extends string
@@ -84,6 +84,9 @@ export class OceanState {
     uReflection: { value: 1 } as U<number>,
     uMoonSpecular: { value: 0.5 } as U<number>,
     uMicroNormals: { value: 0.5 } as U<number>,
+    /** Capillary micro-waves (waves.ts MICRO_WAVES) and their wrapped phases. */
+    uMicro: { value: new Float32Array(MICRO_WAVES.flat()) } as U<Float32Array>,
+    uMicroPhase: { value: new Float32Array(MICRO_WAVES.length) } as U<Float32Array>,
 
     // Bioluminescence (shaders/glow.glsl)
     uGlowColorA: { value: new THREE.Color() } as U<THREE.Color>,
@@ -125,6 +128,9 @@ export class OceanState {
 
   /** Boat motion, written by the camera rig every frame. */
   readonly motion = { heave: 0 };
+
+  /** Ring spacing of the water grid: lets CPU wave sampling match the GPU's LOD. */
+  readonly grid = { minSpacing: 0.12, growth: (2 * Math.PI) / 256 };
 
   /** Current quality tier and smoothed frame rate (read by the debug panel). */
   readonly stats = { tier: 2 as QualityTier, fps: 0, dpr: 1 };
@@ -217,8 +223,20 @@ export class OceanState {
     u.uRippleDisplacement.value = p.ripple.displacement;
     u.uRippleNormal.value = p.ripple.normalStrength;
 
-    this.waves.update(p.waves.list, p.waves.count, p.waves.amplitude, p.waves.speed);
+    this.waves.update(p.waves.list, p.waves.count, p.waves.amplitude, p.waves.speed, this.time);
     u.uWaveCount.value = this.waves.count;
+  }
+
+  /**
+   * Per-frame clock update. The fast periodic phases (Gerstner and micro
+   * waves) are wrapped to [0, 2π) here in float64, so the shaders stay exact
+   * however long the page is left open.
+   */
+  tick(dt: number) {
+    this.time += dt;
+    this.uniforms.uTime.value = this.time;
+    this.waves.setTime(this.time);
+    microPhases(this.time, this.uniforms.uMicroPhase.value);
   }
 }
 

@@ -51,40 +51,42 @@ float fishLight(vec2 p) {
 const float GRAIN_GAIN = 6.0;
 
 // --- Capillary "micro" waves ------------------------------------------------
-// Six short sines (0.3–1.3 m) evaluated only per pixel. They never move the
-// geometry, but they break the moon reflection into a glittering path.
-// (dirX, dirZ, wavelength, slope amplitude)
-const vec4 MICRO[6] = vec4[6](
-  vec4(-0.139, -0.990, 1.31, 0.10),
-  vec4( 0.574, -0.819, 0.93, 0.09),
-  vec4(-0.766, -0.643, 0.71, 0.09),
-  vec4( 0.985, -0.174, 0.53, 0.08),
-  vec4(-0.985,  0.174, 0.39, 0.08),
-  vec4( 0.500,  0.866, 0.29, 0.07)
-);
+// Six short sines (0.3–1.3 m, see MICRO_WAVES in waves.ts) evaluated only per
+// pixel. They never move the geometry, but they break the moon reflection
+// into a glittering path. Their phases (−ω t + seed) are wrapped on the CPU.
+uniform vec4 uMicro[6];         // (dirX, dirZ, wavelength, slope amplitude)
+uniform float uMicroPhase[6];
 
-// Returns the height gradient of the micro waves (xy) and the slope variance
-// lost to LOD (z).
 #if OCEAN_QUALITY >= 1
 #define MICRO_COUNT 6
 #else
 #define MICRO_COUNT 3
 #endif
 
-vec3 microWaves(vec2 p, float t, float footprint, float strength) {
+// Returns the height gradient of the micro waves (xy) and the slope variance
+// lost to LOD (z).
+vec3 microWaves(vec2 p, float footprint, float strength) {
   vec2 grad = vec2(0.0);
   float lostVar = 0.0;
   for (int i = 0; i < MICRO_COUNT; i++) {
-    vec4 m = MICRO[i];
+    vec4 m = uMicro[i];
     float k = 2.0 * PI / m.z;
-    float omega = sqrt(9.81 * k) * 0.6;
     float lod = waveLod(m.z, footprint);
     float slope = m.w * strength;
     lostVar += (1.0 - lod) * slope * slope * 0.5;
-    float f = k * dot(m.xy, p) - omega * t + float(i) * 1.7;
+    float f = k * dot(m.xy, p) + uMicroPhase[i];
     grad += m.xy * (slope * lod * cos(f));
   }
   return vec3(grad, lostVar);
+}
+
+// Schlick's (1 − cosθ)^5 with the cosine clamped into [0, 1]: a dot product of
+// two unit vectors can round to 1 + ε, and pow() of a negative base is NaN on
+// many GPUs (a single NaN pixel would smear into a block through the bloom).
+float schlick5(float cosTheta) {
+  float m = 1.0 - clamp(cosTheta, 0.0, 1.0);
+  float m2 = m * m;
+  return m2 * m2 * m;
 }
 
 void main() {
@@ -96,7 +98,7 @@ void main() {
   float footprint = max(length(fwidth(vRestXZ)), 1e-4);
 
   // --- Surface normal ---------------------------------------------------------
-  WaveSample w = gerstnerSample(vRestXZ, uTime, footprint);
+  WaveSample w = gerstnerSample(vRestXZ, 0.0, footprint);
 
   // Gusts: patches of wind roughen the surface ("cat's paws"), so the moon
   // path is broken up irregularly instead of uniformly.
@@ -105,16 +107,16 @@ void main() {
 #else
   float gust = 0.55;
 #endif
-  vec3 micro = microWaves(vRestXZ, uTime, footprint, uMicroNormals * (0.35 + 0.9 * gust));
+  vec3 micro = microWaves(vRestXZ, footprint, uMicroNormals * (0.35 + 0.9 * gust));
   // Interaction ripples tilt the normal too, so rings catch the sky and moon.
   vec4 ripple = rippleState(vWorldPos.xz);
   vec2 rippleSlope = rippleGradient(vWorldPos.xz) * uRippleNormal;
   vec3 N = normalize(vec3(w.normal.x - micro.x - rippleSlope.x, w.normal.y, w.normal.z - micro.y - rippleSlope.y));
 
-  float NdotV = max(dot(N, V), 1e-3);
+  float NdotV = clamp(dot(N, V), 1e-3, 1.0);
 
   // --- Fresnel (Schlick, water F0 = 0.02) -------------------------------------
-  float fresnel = 0.02 + 0.98 * pow(1.0 - NdotV, 5.0);
+  float fresnel = 0.02 + 0.98 * schlick5(NdotV);
 
   // --- Sky reflection ---------------------------------------------------------
   vec3 R = reflect(-V, N);
@@ -136,11 +138,11 @@ void main() {
   // bright streak while close water breaks it into sharp glints.
   vec3 L = uMoonDir;
   vec3 H = normalize(L + V);
-  float NdotH = max(dot(N, H), 1e-3);
+  float NdotH = clamp(dot(N, H), 1e-3, 1.0);
   float m2 = 0.0004 + uMoonSize * uMoonSize * 0.5 + w.lostVar + micro.z;
   float cos2 = NdotH * NdotH;
   float D = exp((cos2 - 1.0) / (cos2 * m2)) / (PI * m2 * cos2 * cos2);
-  float fresnelL = 0.02 + 0.98 * pow(1.0 - max(dot(H, V), 0.0), 5.0);
+  float fresnelL = 0.02 + 0.98 * schlick5(dot(H, V));
   float NdotL = dot(N, L);
   // Moon irradiance = disc radiance × solid angle (π r²), so a mirror-flat
   // patch reflects the moon at about its own brightness × Fresnel.
@@ -208,11 +210,11 @@ void main() {
   float diffuseLight = diffuseAmount * (1.0 - uGranularity) * mottle;
   float grainLight = grainAmount * uGranularity * grains * GRAIN_GAIN;
 
-  // (e) Colour: grains are the cyan→teal of the spec; the diffuse glow comes
-  //     from a little deeper and is shifted towards blue; breaking crests
-  //     burn towards the pure cyan core.
-  vec3 tint = mix(uGlowColorA, uGlowColorB, vPlankton.y * (1.0 - crest));
-  vec3 deepTint = mix(uGlowDeep, tint, 0.45);
+  // (e) Colour: the cyan→teal of the spec (#00f5ff → #00ffc8, mixed by the
+  //     patch hue noise); the diffuse glow comes from a little deeper and
+  //     gets a touch of blue; breaking crests lean towards the cyan core.
+  vec3 tint = mix(uGlowColorA, uGlowColorB, vPlankton.y * (1.0 - 0.5 * crest));
+  vec3 deepTint = mix(tint, uGlowDeep, 0.15);
 
   // Light from below the surface has to get out through it: Fresnel reflects
   // part of it back down, most of all at grazing angles (softened a little —

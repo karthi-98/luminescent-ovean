@@ -20,10 +20,13 @@ function hasWebGL2(): boolean {
   }
 }
 
-class SceneBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+class SceneBoundary extends Component<{ children: ReactNode; onError: () => void }, { failed: boolean }> {
   state = { failed: false };
   static getDerivedStateFromError() {
     return { failed: true };
+  }
+  componentDidCatch() {
+    this.props.onError();
   }
   render() {
     return this.state.failed ? <Unsupported /> : this.props.children;
@@ -51,6 +54,7 @@ export default function OceanExperience() {
   const [audio] = useState(() => new OceanAudio());
   const [env, setEnv] = useState<ClientEnv | null>(null);
   const [ready, setReady] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [revision, rerender] = useReducer((n: number) => n + 1, 0);
 
   useEffect(() => {
@@ -76,7 +80,7 @@ export default function OceanExperience() {
     <main className={`ocean-root${ready ? ' ocean-root--ready' : ''}`}>
       {env && !env.webgl && <Unsupported />}
       {env?.webgl && (
-        <SceneBoundary>
+        <SceneBoundary onError={() => setFailed(true)}>
           <Scene
             ocean={ocean}
             device={env.device}
@@ -86,7 +90,9 @@ export default function OceanExperience() {
           />
         </SceneBoundary>
       )}
-      <Overlay ocean={ocean} audio={audio} mobile={env ? env.device.mobile : null} />
+      {!(env && (!env.webgl || failed)) && (
+        <Overlay ocean={ocean} audio={audio} touchFirst={env ? env.device.touchFirst : null} />
+      )}
       {showDebug && <DebugControls ocean={ocean} onRerender={rerender} />}
     </main>
   );

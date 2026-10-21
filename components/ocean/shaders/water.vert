@@ -24,7 +24,7 @@ void main() {
   vec2 rest = local + uOrigin;
   float spacing = max(uGridSpacing.x, length(local) * uGridSpacing.y);
 
-  vec3 world = vec3(rest.x, 0.0, rest.y) + gerstnerDisplacement(rest, uTime, spacing);
+  vec3 world = vec3(rest.x, 0.0, rest.y) + gerstnerDisplacement(rest, 0.0, spacing);
   // Interaction ripples: a subtle vertical offset (their glow does the talking).
   world.y += rippleState(world.xz).r * uRippleDisplacement;
 

@@ -93,6 +93,8 @@ export function Water({ grid, tier }: WaterProps) {
 
   const gridSpacing = useMemo(() => ({ value: new THREE.Vector2() }), []);
   gridSpacing.value.set(minSpacing, (2 * Math.PI) / segments);
+  ocean.grid.minSpacing = minSpacing;
+  ocean.grid.growth = (2 * Math.PI) / segments;
 
   const material = useMemo(
     () =>

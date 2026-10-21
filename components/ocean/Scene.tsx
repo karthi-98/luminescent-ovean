@@ -1,10 +1,10 @@
 'use client';
 
-import { PerformanceMonitor } from '@react-three/drei';
+import { PerformanceMonitor, type PerformanceMonitorApi } from '@react-three/drei';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Bloom, ChromaticAberration, EffectComposer, ToneMapping, Vignette } from '@react-three/postprocessing';
 import { ToneMappingMode } from 'postprocessing';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { CameraRig } from './CameraRig';
 import { FilmGrain } from './FilmGrain';
@@ -24,9 +24,7 @@ import { Water } from './Water';
 function Heartbeat() {
   const ocean = useOcean();
   useFrame((state, delta) => {
-    const dt = Math.min(delta, 1 / 20);
-    ocean.time += dt;
-    ocean.uniforms.uTime.value = ocean.time;
+    ocean.tick(Math.min(delta, 1 / 20));
     ocean.uniforms.uPixelRatio.value = state.gl.getPixelRatio();
     // Smoothed fps for the debug panel.
     if (delta > 0) ocean.stats.fps += (1 / delta - ocean.stats.fps) * 0.05;
@@ -37,22 +35,25 @@ function Heartbeat() {
 
 /**
  * Drives rendering instead of R3F's own loop (`frameloop="never"`):
- *  - caps the frame rate (a 120 Hz phone would otherwise render twice as
- *    many frames as anyone can see, and get hot doing it),
+ *  - caps the frame rate at `maxFps` (a 120 Hz phone would otherwise render
+ *    twice as many frames as anyone can see, and get hot doing it). The
+ *    schedule keeps its phase, so 75/90/144 Hz displays still average maxFps;
  *  - stops completely while the tab is hidden (rAF pauses, and we also skip
  *    explicitly), and resumes without a time jump (deltas are clamped).
+ * R3F's never-mode computes delta = timestamp − previous timestamp, so the
+ * timestamp is passed in seconds.
  */
 function FrameDriver({ maxFps }: { maxFps: number }) {
   const advance = useThree((s) => s.advance);
   useEffect(() => {
     let raf = 0;
     let last = 0;
-    const minInterval = 1000 / maxFps - 1.5; // small tolerance for rAF jitter
+    const interval = 1000 / maxFps;
     const loop = (now: number) => {
       raf = requestAnimationFrame(loop);
-      if (document.hidden || now - last < minInterval) return;
-      last = now;
-      advance(now);
+      if (document.hidden || now - last < interval - 1.5) return;
+      last = Math.max(last + interval, now - interval);
+      advance(now / 1000);
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
@@ -97,63 +98,68 @@ function PostFX({ tier }: { tier: QualityTier }) {
   );
 }
 
+/** Pixel ratio for a 0..1 quality factor within the device's DPR range (never above the screen's). */
+function dprFor(device: DeviceProfile, factor: number): number {
+  const [min, max] = device.dpr;
+  const screen = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
+  const dpr = Math.round((min + (max - min) * factor) * 10) / 10;
+  return Math.max(1, Math.min(dpr, screen));
+}
+
 /**
- * Adaptive quality. drei's PerformanceMonitor watches the frame rate:
- * when it drops, the pixel ratio comes down first (cheapest to change);
- * once that is at its floor, the quality tier steps down (particles, ripple
- * resolution, bloom levels, shader detail). Improvement reverses the same
- * way. After too many flip-flops it settles on the lowest settings.
+ * Adaptive quality with drei's PerformanceMonitor.
+ *
+ * The monitor reports "incline" / "decline" every ~2.5 s when the sampled fps
+ * sits above / below the bounds, and moves a 0..1 factor that we map to the
+ * pixel ratio (the cheapest knob). Only when the factor is already at its
+ * floor and fps is still too low does the quality tier step down (particles,
+ * ripple resolution, bloom levels, shader detail); likewise it only steps up
+ * from a saturated factor. After a few genuine direction reversals it stops
+ * adapting and keeps whatever it has, so it cannot oscillate forever.
+ *
+ * Bounds are absolute: drei's fps estimate reads about one frame high, and
+ * its "refreshrate" is just the highest fps it has seen, not the display's.
  */
 function AdaptiveQuality({
   device,
   tier,
   setTier,
-  pinned,
+  setDpr,
 }: {
   device: DeviceProfile;
   tier: QualityTier;
   setTier: (t: QualityTier) => void;
-  pinned: boolean;
+  setDpr: (dpr: number) => void;
 }) {
-  const ocean = useOcean();
-  const setDpr = useThree((s) => s.setDpr);
-  const [minDpr, maxDpr] = device.dpr;
-  const deviceDpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio;
-  const tierRef = useRef(tier);
-  tierRef.current = tier;
+  const control = useRef({ previousFactor: 0.5, lastDirection: 0, reversals: 0, frozen: false, tier });
+  control.current.tier = tier;
 
-  const applyFactor = useCallback(
-    (factor: number) => {
-      const dpr = Math.min(Math.round((minDpr + (maxDpr - minDpr) * factor) * 10) / 10, deviceDpr);
-      setDpr(Math.max(dpr, 1));
-      ocean.stats.dpr = Math.max(dpr, 1);
-    },
-    [minDpr, maxDpr, deviceDpr, setDpr, ocean],
-  );
+  const onStep = (direction: 1 | -1, api: PerformanceMonitorApi) => {
+    const c = control.current;
+    if (c.frozen) {
+      api.factor = c.previousFactor; // ignore: keep the settled DPR
+      return;
+    }
+    if (c.lastDirection !== 0 && direction !== c.lastDirection && ++c.reversals >= 4) {
+      c.frozen = true;
+      api.factor = c.previousFactor;
+      return;
+    }
+    c.lastDirection = direction;
+    if (direction < 0 && c.previousFactor <= 0 && c.tier > 0) setTier((c.tier - 1) as QualityTier);
+    if (direction > 0 && c.previousFactor >= 1 && c.tier < device.maxTier) setTier((c.tier + 1) as QualityTier);
+    c.previousFactor = api.factor;
+  };
 
-  useEffect(() => applyFactor(0.5), [applyFactor]);
-
-  if (pinned) return null;
-  // Desktop aims for 60 fps; phones for a steady 30+ without heating up.
-  const bounds = (refresh: number): [number, number] =>
-    device.mobile ? [30, Math.min(refresh, 60) - 6] : [Math.min(refresh, 60) - 12, Math.min(refresh, 60) - 3];
   return (
     <PerformanceMonitor
       factor={0.5}
       step={0.15}
-      flipflops={6}
-      bounds={bounds}
-      onChange={({ factor }) => applyFactor(factor)}
-      onDecline={({ factor }) => {
-        if (factor <= 0.05 && tierRef.current > 0) setTier((tierRef.current - 1) as QualityTier);
-      }}
-      onIncline={({ factor }) => {
-        if (factor >= 0.95 && tierRef.current < device.maxTier) setTier((tierRef.current + 1) as QualityTier);
-      }}
-      onFallback={() => {
-        setTier(0);
-        applyFactor(0);
-      }}
+      flipflops={Infinity}
+      bounds={() => (device.mobile ? [28, 50] : [45, 56])}
+      onIncline={(api) => onStep(1, api)}
+      onDecline={(api) => onStep(-1, api)}
+      onChange={({ factor }) => setDpr(dprFor(device, factor))}
     />
   );
 }
@@ -173,7 +179,11 @@ export default function Scene({ ocean, device, pinnedTier, onReady }: SceneProps
   const { camera, water, plankton, ripple, life } = ocean.params;
   const [autoTier, setAutoTier] = useState<QualityTier>(device.startTier);
   const tier = pinnedTier ?? autoTier;
+  // The Canvas prop is the single source of truth for DPR: R3F re-applies it
+  // on every render/resize, so it must carry the adaptive value.
+  const [dpr, setDpr] = useState(() => dprFor(device, pinnedTier === null ? 0.5 : pinnedTier / 2));
   ocean.stats.tier = tier;
+  ocean.stats.dpr = dpr;
 
   const grid = useMemo(
     () => ({
@@ -191,7 +201,7 @@ export default function Scene({ ocean, device, pinnedTier, onReady }: SceneProps
     <Canvas
       className="ocean-canvas"
       frameloop="never"
-      dpr={device.dpr[0]}
+      dpr={dpr}
       camera={{ fov: camera.fov, near: camera.near, far: camera.far, position: [0, camera.height, 0] }}
       gl={{
         antialias: false,
@@ -210,7 +220,7 @@ export default function Scene({ ocean, device, pinnedTier, onReady }: SceneProps
     >
       <OceanContext.Provider value={ocean}>
         <FrameDriver maxFps={device.maxFps} />
-        <AdaptiveQuality device={device} tier={tier} setTier={setAutoTier} pinned={pinnedTier !== null} />
+        {pinnedTier === null && <AdaptiveQuality device={device} tier={tier} setTier={setAutoTier} setDpr={setDpr} />}
         <Heartbeat />
         <CameraRig />
         <Sky />

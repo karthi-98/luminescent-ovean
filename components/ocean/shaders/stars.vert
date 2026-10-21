@@ -35,10 +35,11 @@ void main() {
 
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 
-  // Points smaller than ~1.5 px alias into flicker; clamp the size and
-  // compensate the brightness so small stars keep the same total energy.
+  // The sprite's gaussian is ~1/6 of the sprite wide, so below ~3 px it is
+  // narrower than a pixel and twinkles with sub-pixel motion. Clamp the size
+  // (σ ≥ ~0.5 px) and compensate the brightness so the energy is unchanged.
   float size = aSize * uStarSize * uPixelRatio;
-  float clamped = max(size, 1.5 * uPixelRatio);
+  float clamped = max(size, 3.2 * uPixelRatio);
   vIntensity *= (size * size) / (clamped * clamped);
   gl_PointSize = clamped;
 }

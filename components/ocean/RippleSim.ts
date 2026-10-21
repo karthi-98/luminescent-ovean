@@ -51,6 +51,15 @@ export class RippleSim {
   private readonly camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
   private readonly quad: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>;
   private readonly material: THREE.ShaderMaterial;
+  /** Plain texture copy, used to carry the field across resolution changes. */
+  private readonly copyMaterial = new THREE.ShaderMaterial({
+    name: 'RippleCopy',
+    vertexShader: shaders.ripple.vertex,
+    fragmentShader: 'uniform sampler2D uSource; varying vec2 vUv; void main() { gl_FragColor = texture2D(uSource, vUv); }',
+    uniforms: { uSource: { value: null } },
+    depthTest: false,
+    depthWrite: false,
+  });
 
   // Pending inputs, world space.
   private strokeQueued = false;
@@ -103,10 +112,16 @@ export class RippleSim {
     this.setResolution(resolution);
   }
 
-  /** Re-creates the render targets (state is reset). Cheap enough for quality changes. */
+  /**
+   * Re-creates the render targets at a new size. An existing field is carried
+   * over (bilinearly resampled: same domain and centre, so UVs map 1:1), so a
+   * quality-tier change doesn't wipe the trails on screen.
+   */
   setResolution(resolution: number) {
     if (!this.supported || resolution === this.resolution) return;
-    this.disposeTargets();
+    const previous = this.targets;
+    const previousState = previous ? previous[this.read] : null;
+    this.targets = null;
     this.resolution = resolution;
     const make = () =>
       new THREE.WebGLRenderTarget(resolution, resolution, {
@@ -122,7 +137,20 @@ export class RippleSim {
       });
     this.targets = [make(), make()];
     this.read = 0;
-    this.center.set(Number.NaN, Number.NaN);
+    if (previousState) {
+      this.copyMaterial.uniforms.uSource.value = previousState.texture;
+      this.quad.material = this.copyMaterial;
+      const renderer = this.renderer;
+      const previousTarget = renderer.getRenderTarget();
+      renderer.setRenderTarget(this.targets[0]);
+      renderer.render(this.scene, this.camera);
+      renderer.setRenderTarget(previousTarget);
+      this.quad.material = this.material;
+      this.copyMaterial.uniforms.uSource.value = null;
+    } else {
+      this.center.set(Number.NaN, Number.NaN);
+    }
+    previous?.forEach((t) => t.dispose());
     this.output.uRippleTex.value = this.targets[0].texture;
     this.output.uRippleTexel.value = 1 / resolution;
   }
@@ -182,7 +210,10 @@ export class RippleSim {
     // Physical parameters → per-step, per-texel coefficients (resolution independent).
     const c = (settings.waveSpeed * STEP) / texelWorld;
     u.uC2.value = Math.min(c * c, 0.45);
-    u.uDamping.value = Math.pow(settings.damping, STEP);
+    // The wave equation's oscillating modes decay by √d per step when the whole
+    // update is scaled by d, so d = damping^(2·STEP) leaves exactly `damping`
+    // of the amplitude after one second.
+    u.uDamping.value = Math.pow(settings.damping, 2 * STEP);
     u.uEnergyDecay.value = Math.exp(-STEP / Math.max(settings.glowLifetime, 0.05));
     u.uDiffusion.value = Math.min((settings.diffusion * STEP) / (texelWorld * texelWorld), 0.24);
     u.uMotionGlow.value = settings.motionGlow;
@@ -253,6 +284,7 @@ export class RippleSim {
     this.resolution = 0;
     this.quad.geometry.dispose();
     this.material.dispose();
+    this.copyMaterial.dispose();
     this.output.uRippleTex.value = null;
   }
 }

@@ -85,12 +85,17 @@ void main() {
   // Pointer: pushes the water *down to* a target depth along the stroke and
   // lights the plankton it touches *up to* a target level. Targets rather
   // than increments, so a slow or lingering finger doesn't pile up depth or
-  // energy (the brush is applied on every step it overlaps).
+  // energy (the brush is applied on every step it overlaps). Where the brush
+  // holds the water it also cancels the water's velocity (see `hold` below),
+  // otherwise the restoring force would keep charging it under a held brush
+  // and release a big ring as soon as the brush moves on.
+  float hold = 0.0;
   float r = uStrokeParams.x;
   if (r > 0.0) {
     float d = segmentDistance(uv, uStroke.xy, uStroke.zw);
     float brush = exp(-(d * d) / (r * r));
-    push += max(hNext + brush * uStrokeParams.y, 0.0) * min(brush * 2.0, 1.0);
+    hold = min(brush * 2.0, 1.0);
+    push += max(hNext + brush * uStrokeParams.y, 0.0) * hold;
     energy = max(energy, brush * uStrokeParams.z) + brush * uStrokeParams.z * 0.01;
   }
 
@@ -113,5 +118,7 @@ void main() {
 
   energy = clamp(energy * uEnergyDecay, 0.0, 6.0) * mix(0.9, 1.0, edge.x * edge.y);
 
-  gl_FragColor = vec4(hNext, h - push, energy, 1.0);
+  // Previous height: `h − push` turns the inputs into pure displacements; under
+  // a holding brush it is blended to hNext, i.e. zero velocity.
+  gl_FragColor = vec4(hNext, mix(h - push, hNext, hold), energy, 1.0);
 }
