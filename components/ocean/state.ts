@@ -69,6 +69,14 @@ export class OceanState {
     uWaveCount: { value: this.waves.count } as U<number>,
     /** World XZ of the camera-following grid / effect domains. */
     uOrigin: { value: new THREE.Vector2() } as U<THREE.Vector2>,
+
+    // Water body (shaders/water.frag)
+    uWaterColor: { value: new THREE.Color() } as U<THREE.Color>,
+    uDeepColor: { value: new THREE.Color() } as U<THREE.Color>,
+    uFogDensity: { value: 0.0015 } as U<number>,
+    uReflection: { value: 1 } as U<number>,
+    uMoonSpecular: { value: 0.5 } as U<number>,
+    uMicroNormals: { value: 0.5 } as U<number>,
   };
 
   constructor() {
@@ -98,6 +106,13 @@ export class OceanState {
     u.uMoonSize.value = THREE.MathUtils.degToRad(p.moon.size);
     u.uMoonIntensity.value = p.moon.intensity;
     u.uMoonHalo.value = p.moon.halo;
+
+    displayToScene(p.water.baseColor, exposure, u.uWaterColor.value);
+    displayToScene(p.water.deepColor, exposure, u.uDeepColor.value);
+    u.uFogDensity.value = p.water.fogDensity;
+    u.uReflection.value = p.water.reflection;
+    u.uMoonSpecular.value = p.water.moonSpecular;
+    u.uMicroNormals.value = p.water.microNormals;
 
     this.waves.update(p.waves.list, p.waves.count, p.waves.amplitude, p.waves.speed);
     u.uWaveCount.value = this.waves.count;

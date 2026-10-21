@@ -1,5 +1,6 @@
 // Star field: ~3000 points on the sky sphere. Brightness, size, colour and
 // twinkle rate are per-star attributes generated on the CPU.
+#include <ocean_common>
 #include <ocean_sky>
 
 attribute float aSize;
@@ -7,8 +8,6 @@ attribute float aBrightness;
 attribute vec2 aTwinkle;   // (rate, phase)
 attribute vec3 aColor;
 
-uniform float uTime;
-uniform float uPixelRatio;
 uniform float uStarSize;
 uniform float uStarBrightness;
 uniform float uTwinkle;

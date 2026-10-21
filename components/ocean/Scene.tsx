@@ -1,10 +1,13 @@
 'use client';
 
 import { Canvas, useFrame } from '@react-three/fiber';
+import { useState } from 'react';
 import * as THREE from 'three';
 import { CameraRig } from './CameraRig';
+import { detectDevice } from './device';
 import { Sky } from './Sky';
 import { OceanContext, useOcean, type OceanState } from './state';
+import { Water } from './Water';
 
 /**
  * Advances the shared clock before anything else runs each frame. The delta
@@ -26,11 +29,17 @@ export interface SceneProps {
 }
 
 export default function Scene({ ocean }: SceneProps) {
-  const { camera } = ocean.params;
+  const { camera, water } = ocean.params;
+  const [device] = useState(detectDevice);
+  const grid = {
+    segments: device.mobile ? 160 : 256,
+    minSpacing: device.mobile ? 0.16 : 0.12,
+    radius: water.gridRadius,
+  };
   return (
     <Canvas
       className="ocean-canvas"
-      dpr={[1, 2]}
+      dpr={device.dpr}
       camera={{ fov: camera.fov, near: camera.near, far: camera.far, position: [0, camera.height, 0] }}
       gl={{
         antialias: false,
@@ -46,6 +55,7 @@ export default function Scene({ ocean }: SceneProps) {
         <Heartbeat />
         <CameraRig />
         <Sky />
+        <Water grid={grid} />
       </OceanContext.Provider>
     </Canvas>
   );

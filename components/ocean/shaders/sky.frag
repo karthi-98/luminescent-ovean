@@ -1,9 +1,9 @@
 // Sky dome: gradient + moon (disc, maria, corona) + a faint Milky Way.
+#include <ocean_common>
 #include <ocean_noise>
 #include <ocean_sky>
 
 uniform float uMilkyWay;
-uniform float uTime;
 
 varying vec3 vDir;
 
