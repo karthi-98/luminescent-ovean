@@ -82,7 +82,7 @@ export function UnderwaterLife() {
     if (state.timer <= 0) {
       state.timer = -Math.log(1 - Math.random()) * p.interval + 0.4;
       let slot: Fish | null = null;
-      for (const f of fish) if (!f.active) slot = f;
+      for (let i = 0; i < fish.length; i++) if (!fish[i].active) slot = fish[i];
       if (slot) {
         state.anyActive = true;
         // Mostly where the viewer is looking, so the moments aren't wasted.

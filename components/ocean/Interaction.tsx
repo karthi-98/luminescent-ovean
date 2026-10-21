@@ -52,6 +52,11 @@ function intersectWater(
   return true;
 }
 
+/** Inside the part of the ripple domain where strokes are fully visible? */
+function inDomain(v: THREE.Vector3, boat: THREE.Vector2, half: number): boolean {
+  return Math.abs(v.x - boat.x) < half && Math.abs(v.z - boat.y) < half;
+}
+
 /**
  * Pointer / touch → glowing water.
  *
@@ -174,6 +179,7 @@ export function Interaction({ resolution }: { resolution: number }) {
       lastNdc: new THREE.Vector2(),
       hasLast: false,
       sample: { height: 0, nx: 0, ny: 1, nz: 0 } as SurfaceSample,
+      settings: { worldSize: 72, waveSpeed: 2.6, damping: 0.35, glowLifetime: 2, diffusion: 0.1, motionGlow: 0.25 },
     }),
     [],
   );
@@ -189,12 +195,10 @@ export function Interaction({ resolution }: { resolution: number }) {
     const dt = Math.min(delta, 1 / 20);
     const p = ocean.params.ripple;
     const half = p.worldSize * 0.45;
-    const inDomain = (v: THREE.Vector3) =>
-      Math.abs(v.x - ocean.boat.x) < half && Math.abs(v.z - ocean.boat.y) < half;
 
     // Wake: strength follows how recently and how fast the pointer moved.
     const activity = 1 - Math.min((performance.now() - pointer.lastMove) / ACTIVITY_MS, 1);
-    if (pointer.active && activity > 0 && castRay(pointer.ndc, scratch.hit) && inDomain(scratch.hit)) {
+    if (pointer.active && activity > 0 && castRay(pointer.ndc, scratch.hit) && inDomain(scratch.hit, ocean.boat, half)) {
       // Connect to the previous sample unless the pointer jumped (e.g. a new
       // touch elsewhere). Judged on screen, so it holds at any frame rate.
       if (scratch.hasLast && pointer.ndc.distanceTo(scratch.lastNdc) < 0.6) {
@@ -222,20 +226,20 @@ export function Interaction({ resolution }: { resolution: number }) {
     // Tap / click: splash.
     if (pointer.tapQueued) {
       pointer.tapQueued = false;
-      if (castRay(pointer.tap, scratch.hit) && inDomain(scratch.hit)) {
+      if (castRay(pointer.tap, scratch.hit) && inDomain(scratch.hit, ocean.boat, half)) {
         sim.addSplash(scratch.hit.x, scratch.hit.z, p.splashRadius, 0.12 * p.splashStrength, 1.2 * p.splashStrength);
         ocean.addSplash(scratch.hit.x, scratch.hit.z, p.splashStrength);
       }
     }
 
-    sim.update(dt, ocean.boat.x, ocean.boat.y, {
-      worldSize: p.worldSize,
-      waveSpeed: p.waveSpeed,
-      damping: p.damping,
-      glowLifetime: p.glowLifetime,
-      diffusion: p.diffusion,
-      motionGlow: p.motionGlow,
-    });
+    const settings = scratch.settings;
+    settings.worldSize = p.worldSize;
+    settings.waveSpeed = p.waveSpeed;
+    settings.damping = p.damping;
+    settings.glowLifetime = p.glowLifetime;
+    settings.diffusion = p.diffusion;
+    settings.motionGlow = p.motionGlow;
+    sim.update(dt, ocean.boat.x, ocean.boat.y, settings);
   }, -40);
 
   return null;

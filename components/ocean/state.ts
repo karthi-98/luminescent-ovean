@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { createContext, useContext } from 'react';
 import { config } from './config';
 import { directionFromAngles, displayToScene, linearColor } from './colors';
+import type { OceanAudio } from './OceanAudio';
 import type { RippleSim } from './RippleSim';
 import { WaveField } from './waves';
 
@@ -118,6 +119,15 @@ export class OceanState {
 
   /** The interaction simulation, once the canvas has created it. */
   ripple: RippleSim | null = null;
+
+  /** Ambient sound (null until the overlay creates it). */
+  audio: OceanAudio | null = null;
+
+  /** Boat motion, written by the camera rig every frame. */
+  readonly motion = { heave: 0 };
+
+  /** Current quality tier and smoothed frame rate (read by the debug panel). */
+  readonly stats = { tier: 2 as QualityTier, fps: 0, dpr: 1 };
 
   private splashIndex = 0;
   private readonly interactionListeners = new Set<() => void>();

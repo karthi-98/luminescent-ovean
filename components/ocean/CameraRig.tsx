@@ -132,6 +132,7 @@ export function CameraRig() {
     camera.quaternion.multiplyQuaternions(s.tilt, proxy.quaternion);
 
     ocean.uniforms.uOrigin.value.set(bx, bz);
+    ocean.motion.heave = s.vy * p.bobStrength;
   }, -50);
 
   return null;

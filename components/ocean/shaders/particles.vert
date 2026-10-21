@@ -58,9 +58,13 @@ void main() {
   // --- Excitation ---------------------------------------------------------------
   // Crest now, and 0.35 s ago at reduced weight: a short afterglow.
   float crestNow = smoothstep(uGlowCrestThreshold - 0.05, uGlowCrestThreshold + 0.3, 1.0 - w.jacobian);
+#if OCEAN_QUALITY >= 1
   WaveSample wPast = gerstnerSample(rest, uTime - 0.35, 0.0);
   float crestPast = smoothstep(uGlowCrestThreshold - 0.05, uGlowCrestThreshold + 0.3, 1.0 - wPast.jacobian);
   float crest = max(crestNow, crestPast * 0.6);
+#else
+  float crest = crestNow;
+#endif
 
   float stirred = ripple.b;
 

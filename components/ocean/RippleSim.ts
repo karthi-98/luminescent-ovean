@@ -188,11 +188,13 @@ export class RippleSim {
     u.uMotionGlow.value = settings.motionGlow;
     u.uTexel.value.set(1 / res, 1 / res);
 
-    // World → UV for the queued inputs.
-    const toU = (x: number) => (x - nx) / this.worldSize + 0.5;
-    const toV = (z: number) => (z - nz) / this.worldSize + 0.5;
+    // World → UV for the queued inputs: u = (x − centre) / size + 0.5.
+    const inv = 1 / this.worldSize;
+    const ou = 0.5 - nx * inv;
+    const ov = 0.5 - nz * inv;
     if (this.strokeQueued) {
-      u.uStroke.value.set(toU(this.stroke.x), toV(this.stroke.y), toU(this.stroke.z), toV(this.stroke.w));
+      const st = this.stroke;
+      u.uStroke.value.set(st.x * inv + ou, st.y * inv + ov, st.z * inv + ou, st.w * inv + ov);
       u.uStrokeParams.value.set(this.strokeParams.x / this.worldSize, this.strokeParams.y, this.strokeParams.z);
     } else {
       u.uStrokeParams.value.set(0, 0, 0);
@@ -201,7 +203,7 @@ export class RippleSim {
     const sourceEnergy = u.uSourceEnergy.value as Float32Array;
     for (let i = 0; i < MAX_SOURCES; i++) {
       const s = this.sources[i];
-      sources[i].set(toU(s.x), toV(s.y), toU(s.z), toV(s.w));
+      sources[i].set(s.x * inv + ou, s.y * inv + ov, s.z * inv + ou, s.w * inv + ov);
       sourceEnergy[i] = this.sourceEnergy[i];
     }
     u.uSourceRadius.value = this.sourceRadius / this.worldSize;
@@ -216,7 +218,7 @@ export class RippleSim {
       // act on every step they span.
       u.uShift.value.set(i === 0 ? shiftX : 0, i === 0 ? shiftZ : 0);
       if (i === 0 && this.splashQueued) {
-        u.uSplash.value.set(toU(this.splash.x), toV(this.splash.y), this.splash.z / this.worldSize, this.splash.w);
+        u.uSplash.value.set(this.splash.x * inv + ou, this.splash.y * inv + ov, this.splash.z * inv, this.splash.w);
         u.uSplashEnergy.value = this.splashEnergy;
       } else {
         u.uSplash.value.set(0, 0, 0, 0);

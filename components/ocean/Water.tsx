@@ -1,7 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { shaders } from './shaders';
-import { useOcean } from './state';
+import { useOcean, type QualityTier } from './state';
 
 export interface GridSpec {
   /** Vertices per ring. */
@@ -78,10 +78,11 @@ export function createRadialGrid({ segments, minSpacing, radius }: GridSpec): TH
 
 export interface WaterProps {
   grid: GridSpec;
+  tier: QualityTier;
 }
 
 /** The ocean surface: camera-following radial grid + water shaders. */
-export function Water({ grid }: WaterProps) {
+export function Water({ grid, tier }: WaterProps) {
   const ocean = useOcean();
   const { segments, minSpacing, radius } = grid;
 
@@ -100,9 +101,19 @@ export function Water({ grid }: WaterProps) {
         uniforms: { ...ocean.uniforms, uGridSpacing: gridSpacing },
         vertexShader: shaders.water.vertex,
         fragmentShader: shaders.water.fragment,
+        defines: { OCEAN_QUALITY: 1 },
       }),
     [ocean, gridSpacing],
   );
+
+  // Shader detail follows the quality tier (recompiles once per change).
+  useEffect(() => {
+    const quality = tier === 0 ? 0 : 1;
+    if (material.defines.OCEAN_QUALITY !== quality) {
+      material.defines.OCEAN_QUALITY = quality;
+      material.needsUpdate = true;
+    }
+  }, [material, tier]);
 
   useEffect(() => () => geometry.dispose(), [geometry]);
   useEffect(() => () => material.dispose(), [material]);

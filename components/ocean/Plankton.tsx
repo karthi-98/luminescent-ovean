@@ -2,13 +2,14 @@ import { useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { shaders } from './shaders';
-import { useOcean } from './state';
+import { useOcean, type QualityTier } from './state';
 
 export interface PlanktonProps {
   /** Particles allocated (the maximum any quality tier will draw). */
   capacity: number;
   /** Particles drawn right now (adaptive quality lowers this without reallocating). */
   count: number;
+  tier: QualityTier;
 }
 
 function createPlanktonGeometry(capacity: number): THREE.BufferGeometry {
@@ -45,7 +46,7 @@ function createPlanktonGeometry(capacity: number): THREE.BufferGeometry {
  * GPU plankton: tens of thousands of points that stay dark until a crest,
  * a wake, a splash or a fish excites them (see shaders/particles.vert).
  */
-export function Plankton({ capacity, count }: PlanktonProps) {
+export function Plankton({ capacity, count, tier }: PlanktonProps) {
   const ocean = useOcean();
   const geometry = useMemo(() => createPlanktonGeometry(capacity), [capacity]);
   useEffect(() => {
@@ -71,12 +72,21 @@ export function Plankton({ capacity, count }: PlanktonProps) {
         uniforms: { ...ocean.uniforms, ...local },
         vertexShader: shaders.particles.vertex,
         fragmentShader: shaders.particles.fragment,
+        defines: { OCEAN_QUALITY: 1 },
         transparent: true,
         depthWrite: false,
         blending: THREE.AdditiveBlending,
       }),
     [ocean, local],
   );
+
+  useEffect(() => {
+    const quality = tier === 0 ? 0 : 1;
+    if (material.defines.OCEAN_QUALITY !== quality) {
+      material.defines.OCEAN_QUALITY = quality;
+      material.needsUpdate = true;
+    }
+  }, [material, tier]);
 
   useEffect(() => () => geometry.dispose(), [geometry]);
   useEffect(() => () => material.dispose(), [material]);

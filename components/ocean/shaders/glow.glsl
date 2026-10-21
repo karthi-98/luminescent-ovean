@@ -17,6 +17,11 @@
 // sliding across them.
 // ---------------------------------------------------------------------------
 
+// OCEAN_QUALITY (material define): 0 = low tier (cheaper), 1 = full.
+#ifndef OCEAN_QUALITY
+#define OCEAN_QUALITY 1
+#endif
+
 uniform vec3 uGlowColorA;          // cyan core  (#00f5ff, linear)
 uniform vec3 uGlowColorB;          // teal       (#00ffc8, linear)
 uniform vec3 uGlowDeep;            // bluer light from deeper water
@@ -116,6 +121,11 @@ float sparkleField(vec2 p, float t, float footprint, float prob) {
   float s = uSparkleScale;
   float g = 0.8 * grainOctave(p, s, prob * 0.7, t, footprint, 1);
   g += 1.0 * grainOctave(p + vec2(3.17, -1.9), s * 2.31, prob, t * 1.3, footprint, 2);
+#if OCEAN_QUALITY >= 1
   g += 1.0 * grainOctave(p - vec2(7.41, 2.6), s * 5.13, prob, t * 1.7, footprint, 3);
+#else
+  // Low tier: the finest octave contributes its average only.
+  g += prob * 0.3125 * 0.65 * 6.2831853 * 0.01;
+#endif
   return g;
 }

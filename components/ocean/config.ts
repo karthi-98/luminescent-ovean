@@ -194,10 +194,10 @@ export const config = {
     bloomRadius: 0.75,
     /** Vignette darkness (0 = off). */
     vignette: 0.5,
-    /** Film grain opacity (soft-light blend). */
-    grain: 0.22,
+    /** Film grain amount (0 = off, 1 = heavy). */
+    grain: 0.35,
     /** Radial chromatic aberration at the frame edges (UV offset). */
-    chromaticAberration: 0.0007,
+    chromaticAberration: 0.00045,
     /** ACES exposure. Sky/water colours are compensated, so this mostly scales the glow. */
     exposure: 1.0,
   },

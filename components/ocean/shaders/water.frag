@@ -65,10 +65,16 @@ const vec4 MICRO[6] = vec4[6](
 
 // Returns the height gradient of the micro waves (xy) and the slope variance
 // lost to LOD (z).
+#if OCEAN_QUALITY >= 1
+#define MICRO_COUNT 6
+#else
+#define MICRO_COUNT 3
+#endif
+
 vec3 microWaves(vec2 p, float t, float footprint, float strength) {
   vec2 grad = vec2(0.0);
   float lostVar = 0.0;
-  for (int i = 0; i < 6; i++) {
+  for (int i = 0; i < MICRO_COUNT; i++) {
     vec4 m = MICRO[i];
     float k = 2.0 * PI / m.z;
     float omega = sqrt(9.81 * k) * 0.6;
@@ -94,7 +100,11 @@ void main() {
 
   // Gusts: patches of wind roughen the surface ("cat's paws"), so the moon
   // path is broken up irregularly instead of uniformly.
+#if OCEAN_QUALITY >= 1
   float gust = smoothstep(-0.6, 0.8, snoise(vec3(vRestXZ * 0.035, uTime * 0.025)));
+#else
+  float gust = 0.55;
+#endif
   vec3 micro = microWaves(vRestXZ, uTime, footprint, uMicroNormals * (0.35 + 0.9 * gust));
   // Interaction ripples tilt the normal too, so rings catch the sky and moon.
   vec4 ripple = rippleState(vWorldPos.xz);
@@ -153,7 +163,11 @@ void main() {
   //     have had (from their lost slope variance).
   vec2 grainPos = vRestXZ - uCurrent * uTime;
   float fold = 1.0 - w.jacobian;
+#if OCEAN_QUALITY >= 1
   float foam = snoise(vec3(grainPos * 1.6, uTime * 0.35));
+#else
+  float foam = 0.0;
+#endif
   float crest = smoothstep(uGlowCrestThreshold, uGlowCrestThreshold + 0.3, fold + 0.12 * foam);
   crest *= smoothstep(-0.7, 0.3, foam + crest * 0.6);
   float crestSoft = smoothstep(uGlowCrestThreshold - 0.25, uGlowCrestThreshold + 0.35, fold);
@@ -182,7 +196,11 @@ void main() {
   //     mottled at the metre scale, plus discrete flashing grains. Crests put
   //     most of their light into grains (foam is made of sparks).
   float mottleLod = 1.0 - smoothstep(0.08, 0.3, footprint);
+#if OCEAN_QUALITY >= 1
   float mottle = 1.0 + mottleLod * 0.6 * snoise(vec3(grainPos * 0.8, uTime * 0.12));
+#else
+  float mottle = 1.0;
+#endif
   float grains = sparkleField(grainPos, uTime, footprint, prob);
 
   float diffuseAmount = plankton * (uGlowAmbient * waveStir + uGlowCrest * breaking * 0.4) + stirPlankton * touched * 0.8;
