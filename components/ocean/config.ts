@@ -94,8 +94,8 @@ export const config = {
     fogDensity: 0.0016,
     /** Strength of the sky reflection (on top of physical Fresnel). */
     reflection: 1.0,
-    /** Moonlight on the water: overall strength of the glitter path. */
-    moonSpecular: 0.55,
+    /** Moonlight on the water: 1 = physically matched to the moon disc, >1 exaggerates the path. */
+    moonSpecular: 2.4,
     /** Small capillary ripples that break the moon path into glitter. */
     microNormals: 0.55,
     /** Radius of the camera-following grid; must stay inside camera.far. */

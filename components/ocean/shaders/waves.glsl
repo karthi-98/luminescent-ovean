@@ -50,6 +50,7 @@ struct WaveSample {
   vec3 displacement;
   vec3 normal;
   float jacobian;   // 1 = undisturbed, → 0 at sharp / breaking crests
+  float lostVar;    // slope variance of the waves LOD removed (for specular AA)
 };
 
 // Full evaluation with the analytic tangent frame — used per pixel.
@@ -57,11 +58,16 @@ WaveSample gerstnerSample(vec2 p, float t, float footprint) {
   vec3 d = vec3(0.0);
   vec3 T = vec3(1.0, 0.0, 0.0);
   vec3 Bn = vec3(0.0, 0.0, 1.0);
+  float lostVar = 0.0;
   for (int i = 0; i < MAX_WAVES; i++) {
     if (i >= uWaveCount) break;
     vec4 A = uWaveA[i];
     vec4 B = uWaveB[i];
     float lod = waveLod(B.w, footprint);
+    // A sinusoid with slope amplitude Q has slope variance Q²/2. Whatever is
+    // faded out here is handed to the specular lobe as extra roughness, so
+    // the moon path keeps its brightness and width at every distance.
+    lostVar += (1.0 - lod) * B.x * B.x * 0.5;
     if (lod <= 0.0) continue;
     vec2 D = A.xy;
     float f = A.z * (dot(D, p) - A.w * t) + B.z;
@@ -78,5 +84,6 @@ WaveSample gerstnerSample(vec2 p, float t, float footprint) {
   w.displacement = d;
   w.normal = normalize(cross(Bn, T));
   w.jacobian = T.x * Bn.z - T.z * Bn.x;
+  w.lostVar = lostVar;
   return w;
 }
