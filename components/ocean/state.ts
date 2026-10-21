@@ -77,6 +77,23 @@ export class OceanState {
     uReflection: { value: 1 } as U<number>,
     uMoonSpecular: { value: 0.5 } as U<number>,
     uMicroNormals: { value: 0.5 } as U<number>,
+
+    // Bioluminescence (shaders/glow.glsl)
+    uGlowColorA: { value: new THREE.Color() } as U<THREE.Color>,
+    uGlowColorB: { value: new THREE.Color() } as U<THREE.Color>,
+    uGlowDeep: { value: new THREE.Color() } as U<THREE.Color>,
+    uGlowIntensity: { value: 1 } as U<number>,
+    uGlowAmbient: { value: 0.3 } as U<number>,
+    uGlowCrest: { value: 3 } as U<number>,
+    uGlowCrestThreshold: { value: 0.3 } as U<number>,
+    uGlowRipple: { value: 4 } as U<number>,
+    uNoiseScale: { value: 0.045 } as U<number>,
+    uPatchCoverage: { value: 0.55 } as U<number>,
+    uBaseDensity: { value: 0.2 } as U<number>,
+    uGlowDrift: { value: 0.035 } as U<number>,
+    uGranularity: { value: 0.8 } as U<number>,
+    uSparkleScale: { value: 3 } as U<number>,
+    uCurrent: { value: new THREE.Vector2(0.05, -0.03) } as U<THREE.Vector2>,
   };
 
   constructor() {
@@ -113,6 +130,22 @@ export class OceanState {
     u.uReflection.value = p.water.reflection;
     u.uMoonSpecular.value = p.water.moonSpecular;
     u.uMicroNormals.value = p.water.microNormals;
+
+    const g = p.glow;
+    linearColor(g.colorA, u.uGlowColorA.value);
+    linearColor(g.colorB, u.uGlowColorB.value);
+    linearColor(g.deepColor, u.uGlowDeep.value);
+    u.uGlowIntensity.value = g.intensity;
+    u.uGlowAmbient.value = g.ambient;
+    u.uGlowCrest.value = g.crest;
+    u.uGlowCrestThreshold.value = g.crestThreshold;
+    u.uGlowRipple.value = g.ripple;
+    u.uNoiseScale.value = g.noiseScale;
+    u.uPatchCoverage.value = g.patchCoverage;
+    u.uBaseDensity.value = g.baseDensity;
+    u.uGlowDrift.value = g.drift;
+    u.uGranularity.value = g.granularity;
+    u.uSparkleScale.value = g.sparkleScale;
 
     this.waves.update(p.waves.list, p.waves.count, p.waves.amplitude, p.waves.speed);
     u.uWaveCount.value = this.waves.count;

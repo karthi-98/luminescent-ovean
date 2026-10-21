@@ -111,25 +111,25 @@ export const config = {
     /** Master multiplier on every emissive term. */
     intensity: 1.0,
     /** Soft, always-on glow inside plankton patches. */
-    ambient: 0.32,
+    ambient: 1.0,
     /** Glow at breaking crests / whitecaps. */
-    crest: 3.2,
+    crest: 3.6,
     /** Jacobian fold amount where crests start to light up (0..1). */
-    crestThreshold: 0.3,
+    crestThreshold: 0.2,
     /** Glow from the interaction heightfield (mouse / touch / fish). */
     ripple: 4.0,
     /** World-space scale of the drifting plankton patches (1 / metres). */
-    noiseScale: 0.045,
+    noiseScale: 0.05,
     /** Fraction of the sea surface covered by dense patches (0..1). */
     patchCoverage: 0.55,
     /** Glow outside of patches relative to inside (plankton is everywhere, just thinner). */
-    baseDensity: 0.18,
+    baseDensity: 0.15,
     /** Speed of the patch drift / morphing. */
     drift: 0.035,
     /** How granular the glow is: 0 = smooth, 1 = all sparkle. */
-    granularity: 0.82,
-    /** Grains per metre of the finest sparkle octave. */
-    sparkleScale: 11.0,
+    granularity: 0.6,
+    /** Grains per metre of the coarsest sparkle octave (finer octaves are 2.3× and 5.1×). */
+    sparkleScale: 3.2,
   },
 
   ripple: {

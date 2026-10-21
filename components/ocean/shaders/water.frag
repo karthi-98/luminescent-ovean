@@ -2,13 +2,14 @@
 // Water surface — fragment stage.
 //
 //   colour = mix(body, sky reflection, Fresnel) + moon glitter       (base)
-//          + bioluminescence                                          (stage 4)
+//          + bioluminescence (see ocean_glow for the model)
 //   then distance fog towards the sky's own horizon colour.
 // ---------------------------------------------------------------------------
 #include <ocean_common>
 #include <ocean_noise>
 #include <ocean_sky>
 #include <ocean_waves>
+#include <ocean_glow>
 
 #define PI 3.14159265
 
@@ -21,6 +22,11 @@ uniform float uMicroNormals;
 
 varying vec3 vWorldPos;
 varying vec2 vRestXZ;
+varying vec2 vPlankton;
+
+// Grains are tiny: their peak brightness must be far above their average for
+// them to read as sparks (see grainOctave for the mean).
+const float GRAIN_GAIN = 6.0;
 
 // --- Capillary "micro" waves ------------------------------------------------
 // Six short sines (0.3–1.3 m) evaluated only per pixel. They never move the
@@ -107,6 +113,69 @@ void main() {
   float moonIrradiance = uMoonIntensity * PI * uMoonSize * uMoonSize * uMoonSpecular;
   vec3 glitter = uMoonColor * moonIrradiance * D * fresnelL / (4.0 * NdotV) * smoothstep(-0.05, 0.1, NdotL);
   col += glitter;
+
+  // --- Bioluminescence --------------------------------------------------------
+  // (a) How much plankton is here: drifting patches, thinner but never zero
+  //     outside them.
+  float density = vPlankton.x;
+  float plankton = mix(uBaseDensity, 1.0, density);
+
+  // (b) Breaking crests: the Jacobian falls where Gerstner crests compress the
+  //     surface; past the threshold the wave is "breaking" and shears the
+  //     water hardest. A foam-like noise breaks the crest glow into ragged
+  //     patches instead of smooth caps. LOD removed the short chop far away,
+  //     so add a little of the crest coverage those unresolved waves would
+  //     have had (from their lost slope variance).
+  vec2 grainPos = vRestXZ - uCurrent * uTime;
+  float fold = 1.0 - w.jacobian;
+  float foam = snoise(vec3(grainPos * 1.6, uTime * 0.35));
+  float crest = smoothstep(uGlowCrestThreshold, uGlowCrestThreshold + 0.3, fold + 0.12 * foam);
+  crest *= smoothstep(-0.7, 0.3, foam + crest * 0.6);
+  float crestSoft = smoothstep(uGlowCrestThreshold - 0.25, uGlowCrestThreshold + 0.35, fold);
+  float unresolved = clamp(w.lostVar * 5.0, 0.0, 1.0) * 0.07 * density;
+  float breaking = max(crest, unresolved);
+
+  // (c) Interaction heightfield: added in the ripple stage.
+  float stirred = 0.0;
+
+  // Wave motion itself stirs the plankton: the rising, compressed faces near
+  // crests glow, the stretched troughs between them stay darker.
+  float waveStir = 0.3 + 1.1 * crestSoft;
+
+  // How strongly the plankton is being agitated (HDR light multiplier)…
+  float energy = uGlowAmbient * waveStir + uGlowCrest * breaking + uGlowRipple * stirred;
+  // …and what fraction of cells flash because of it.
+  float prob = clamp(0.1 + 0.4 * density + 1.2 * (breaking + stirred) + 0.2 * crestSoft, 0.0, 1.0);
+
+  // (d) Structure: a soft diffuse part (light scattered under the surface),
+  //     mottled at the metre scale, plus discrete flashing grains. Crests put
+  //     most of their light into grains (foam is made of sparks).
+  float mottleLod = 1.0 - smoothstep(0.08, 0.3, footprint);
+  float mottle = 1.0 + mottleLod * 0.6 * snoise(vec3(grainPos * 0.8, uTime * 0.12));
+  float grains = sparkleField(grainPos, uTime, footprint, prob);
+
+  float diffuseEnergy = uGlowAmbient * waveStir + (uGlowCrest * breaking + uGlowRipple * stirred) * 0.4;
+  float diffuseLight = plankton * diffuseEnergy * (1.0 - uGranularity) * mottle;
+  float grainLight = plankton * energy * uGranularity * grains * GRAIN_GAIN;
+
+  // (e) Colour: grains are the cyan→teal of the spec; the diffuse glow comes
+  //     from a little deeper and is shifted towards blue; breaking crests
+  //     burn towards the pure cyan core.
+  vec3 tint = mix(uGlowColorA, uGlowColorB, vPlankton.y * (1.0 - crest));
+  vec3 deepTint = mix(uGlowDeep, tint, 0.45);
+
+  // Light from below the surface has to get out through it: Fresnel reflects
+  // part of it back down, most of all at grazing angles (softened a little —
+  // the glow is the subject). Crest foam sits on top of the surface, so it is
+  // attenuated less.
+  float transmit = 1.0 - 0.8 * fresnel;
+  vec3 glow = deepTint * diffuseLight * transmit + tint * grainLight * mix(transmit, 1.0, 0.5 + 0.5 * crest);
+
+  // Glow travels through more haze than the reflected sky (it starts below the
+  // surface and is dim per unit area), so it fades out sooner with distance;
+  // this keeps the far sea from turning into a bright band at the horizon.
+  float glowFade = exp(-pow(uFogDensity * dist * 2.2, 2.0));
+  col += glow * uGlowIntensity * glowFade;
 
   // --- Distance fog -----------------------------------------------------------
   // Fades to skyColor at the horizon in this azimuth (incl. the moon halo),

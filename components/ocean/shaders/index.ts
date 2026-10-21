@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
 import commonChunk from './common.glsl';
+import glowChunk from './glow.glsl';
 import noiseChunk from './noise.glsl';
 import skyChunk from './sky.glsl';
 import wavesChunk from './waves.glsl';
@@ -22,6 +23,7 @@ const chunks: Record<string, string> = {
   ocean_noise: noiseChunk,
   ocean_sky: skyChunk,
   ocean_waves: wavesChunk,
+  ocean_glow: glowChunk,
 };
 
 const registry = THREE.ShaderChunk as unknown as Record<string, string>;

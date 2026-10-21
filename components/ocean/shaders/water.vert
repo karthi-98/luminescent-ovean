@@ -8,12 +8,15 @@
 // sparse far rings never alias.
 // ---------------------------------------------------------------------------
 #include <ocean_common>
+#include <ocean_noise>
 #include <ocean_waves>
+#include <ocean_glow>
 
 uniform vec2 uGridSpacing;  // (min spacing near the camera, spacing growth per metre)
 
 varying vec3 vWorldPos;     // displaced world position
 varying vec2 vRestXZ;       // undisplaced world XZ ("which water particle is this")
+varying vec2 vPlankton;     // (density, hue): low-frequency, so evaluated per vertex
 
 void main() {
   vec2 local = position.xz;
@@ -24,5 +27,6 @@ void main() {
 
   vWorldPos = world;
   vRestXZ = rest;
+  vPlankton = planktonField(rest, uTime, spacing);
   gl_Position = projectionMatrix * viewMatrix * vec4(world, 1.0);
 }
