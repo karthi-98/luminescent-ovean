@@ -42,7 +42,7 @@ export class OceanState {
   readonly waves = new WaveField();
 
   /** Simulation time in seconds (clamped per frame, so tab switches don't jump). */
-  time = 0;
+  time = config.startTime;
 
   /** Horizontal boat position; the grid, ripple domain and particles follow it. */
   readonly boat = new THREE.Vector2(0, 0);

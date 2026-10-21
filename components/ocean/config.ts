@@ -21,6 +21,12 @@ export interface WaveParams {
 export const MAX_WAVES = 8;
 
 export const config = {
+  /**
+   * Simulation clock at load, seconds. Plankton patches drift slowly, so this
+   * picks the moment the scene opens on (t = 20 puts a bright patch by the boat).
+   */
+  startTime: 20,
+
   sky: {
     zenith: '#01030a',
     horizon: '#0a1a2e',
@@ -42,7 +48,7 @@ export const config = {
     size: 1.15,
     color: '#dfe6f2',
     /** Disc brightness. Kept below the plankton glow on purpose. */
-    intensity: 0.85,
+    intensity: 0.7,
     halo: 0.32,
   },
 
@@ -109,7 +115,7 @@ export const config = {
     /** Light scattered back up from deeper plankton is a touch bluer. */
     deepColor: '#0077ff',
     /** Master multiplier on every emissive term. */
-    intensity: 1.0,
+    intensity: 1.25,
     /** Soft, always-on glow inside plankton patches. */
     ambient: 0.5,
     /** Glow at breaking crests / whitecaps. */
@@ -180,13 +186,19 @@ export const config = {
   },
 
   post: {
+    /** Only HDR luminance above this blooms (the glow; the dark sea and sky never do). */
     bloomThreshold: 0.6,
-    bloomSmoothing: 0.25,
-    bloomIntensity: 1.35,
-    bloomRadius: 0.72,
-    vignette: 0.55,
-    grain: 0.055,
-    chromaticAberration: 0.0006,
+    bloomSmoothing: 0.3,
+    bloomIntensity: 1.5,
+    /** Mipmap-blur radius (0..1): how far the glow halo spreads. */
+    bloomRadius: 0.75,
+    /** Vignette darkness (0 = off). */
+    vignette: 0.5,
+    /** Film grain opacity (soft-light blend). */
+    grain: 0.22,
+    /** Radial chromatic aberration at the frame edges (UV offset). */
+    chromaticAberration: 0.0007,
+    /** ACES exposure. Sky/water colours are compensated, so this mostly scales the glow. */
     exposure: 1.0,
   },
 } as const;
