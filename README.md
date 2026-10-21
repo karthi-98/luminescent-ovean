@@ -111,7 +111,7 @@ Everything lives in [`components/ocean/config.ts`](components/ocean/config.ts). 
 - Frame rate is capped at 60 fps (a 120 Hz phone would otherwise render twice as many frames and heat up; 75/90/144 Hz screens still average 60), and rendering stops entirely while the tab is hidden.
 - Long sessions stay smooth: the fast wave phases are wrapped on the CPU in double precision every frame, so float32 shader precision never degrades the animation.
 - DPR is clamped to [1, 1.5] on phones and [1, 2] on desktop.
-- **Adaptive quality** (drei `PerformanceMonitor`, absolute fps bounds: desktop 45–56, phones 28–50): when the frame rate drops the pixel ratio comes down first, and only then the quality tier. Headroom reverses the same way. After a few genuine direction reversals it stops adapting, so it cannot oscillate. Live trails survive tier changes (the ripple field is resampled, not reset).
+- **Adaptive quality** (drei `PerformanceMonitor`): when the frame rate drops, the pixel ratio comes down first, and only then the quality tier. Headroom reverses this, but a tier only steps up when the scene is running at the 60 fps cap. The targets are about 53+ fps on desktop and 29+ fps on phones. Repeated flip-flopping locks upward moves (2 min, then 4, 8…), so it settles instead of thrashing. If cuts don't raise the frame rate because something else limits it (browser power saving, a 30 Hz screen, a busy CPU), they are undone, so quality isn't lost for nothing. Live trails survive tier changes: the ripple field is resampled, not reset.
 
 | tier | particles | ripple texture | bloom mips | MSAA | shader detail |
 |---|---|---|---|---|---|
