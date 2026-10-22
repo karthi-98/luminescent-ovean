@@ -2,11 +2,11 @@
   "name": "luminescent-ocean",
   "version": "0.1.0",
   "private": true,
-  "description": "Bioluminescent night ocean — a real-time WebGL scene built with Next.js, three.js and react-three-fiber.",
+  "description": "Bioluminescent night ocean \u2014 a real-time WebGL scene built with Next.js, three.js and react-three-fiber.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "npx --yes serve@14 out",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

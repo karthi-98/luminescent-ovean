@@ -6,6 +6,8 @@ A real-time, cinematic WebGL scene of the open sea at night, where the water glo
 
 Built with **Next.js 16 (App Router, TypeScript)**, **three.js r186**, **@react-three/fiber 9**, **@react-three/drei**, **@react-three/postprocessing** and hand-written GLSL.
 
+**Live:** https://karthi-98.github.io/luminescent-ovean/ (deployed by `.github/workflows/pages.yml` on every push).
+
 ## Run it
 
 Requires Node.js ≥ 20.9.
@@ -15,11 +17,11 @@ npm install
 npm run dev        # http://localhost:3000  (leva debug panel visible)
 ```
 
-Production:
+Production (a fully static export in `out/`, also what GitHub Pages serves):
 
 ```bash
 npm run build
-npm start          # http://localhost:3000  (no debug panel)
+npm start          # serves out/ at http://localhost:3000  (no debug panel)
 npm run typecheck  # optional
 ```
 

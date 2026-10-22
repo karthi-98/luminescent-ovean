@@ -8,8 +8,20 @@ import type { NextConfig } from 'next';
  */
 const shaderGlobs = ['*.glsl', '*.vert', '*.frag'] as const;
 
+/**
+ * GitHub Pages serves the site from /<repo>/. The deploy workflow sets
+ * PAGES_BASE_PATH (e.g. "/luminescent-ovean"); locally it is empty, so
+ * `npm run dev` / `npm start` keep serving from the root.
+ */
+const basePath = process.env.PAGES_BASE_PATH || '';
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Fully static site: `next build` writes plain files to out/ (GitHub Pages).
+  output: 'export',
+  basePath,
+  assetPrefix: basePath || undefined,
+  trailingSlash: true,
   // Keep the corner badge out of the fullscreen scene; errors still show as overlays.
   devIndicators: false,
   agentRules: false,
